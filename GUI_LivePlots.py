@@ -1,7 +1,14 @@
 import pyqtgraph as pg
-from PyQt5.QtWidgets import QVBoxLayout, QLabel, QGridLayout, QFrame
+from PyQt5.QtWidgets import (
+    QVBoxLayout,
+    QLabel,
+    QGridLayout,
+    QFrame,
+    QHBoxLayout,
+)
 from PyQt5.QtCore import Qt, QTimer
 from PyQt5.QtWidgets import QWidget
+from PyQt5.QtGui import QFont, QColor, QPixmap
 from time import time
 
 
@@ -16,127 +23,133 @@ class GUILivePlots(QWidget):
         self.setup_timer()
 
     def init_live_plots(self):
-        # Set light mode for pyqtgraph globally
         pg.setConfigOption("background", self.color_palette["plot_bg"])
         pg.setConfigOption("foreground", self.color_palette["plot_fg"])
 
-        # Main layout for the widget
         self.main_layout = QVBoxLayout(self)
-        self.main_layout.setContentsMargins(0, 0, 0, 0)
+        self.main_layout.setContentsMargins(5, 5, 5, 5)
 
-        # Outer frame for rounded background
         outer_frame = QFrame(self)
         outer_frame.setStyleSheet(
-            f"""
-            background-color: {self.color_palette['grey']};
-            border-radius: 10px;
-            """
+            "background-color: {}; border-radius: 5px;".format(
+                self.color_palette["grey"]
+            )
         )
         outer_layout = QVBoxLayout(outer_frame)
-        outer_layout.setContentsMargins(20, 20, 20, 20)
+        outer_layout.setContentsMargins(5, 5, 5, 5)
         self.main_layout.addWidget(outer_frame)
 
-        # Title for live plots
+        # Header layout for title and legend
         plot_title = QLabel("Live Data", self)
         plot_title.setAlignment(Qt.AlignCenter)
         plot_title.setStyleSheet(
-            """
-            font-size: 24px;
-            font-family: 'Roboto', sans-serif;
-            margin: 10px;
-            """
+            "font-size: 28px; font-family: 'Roboto'; margin-right: 30px;"
         )
-        outer_layout.addWidget(plot_title)
 
-        # Styled container for plots
+        # Container for title and legend
+        header_layout = QHBoxLayout()
+        outer_layout.addLayout(header_layout)
+        header_layout.addWidget(plot_title, alignment=Qt.AlignCenter)
+
+        # Create a sub-layout for legends
+        legend_layout = QHBoxLayout()
+        self.add_legend_icon(legend_layout, "X", self.color_palette["plot_lines_x"])
+        self.add_legend_icon(legend_layout, "Y", self.color_palette["plot_lines_y"])
+        self.add_legend_icon(legend_layout, "Z", self.color_palette["plot_lines_z"])
+        legend_layout.setSpacing(10)  # Adjust space between icons
+        legend_layout.setContentsMargins(0, 0, 0, 0)  # Remove any extra padding
+
+        # Add the legend layout to the header
+        header_layout.addLayout(legend_layout)
+        header_layout.setAlignment(Qt.AlignCenter)  # Center the header content
+
+        # Continue
         plots_container = QFrame(self)
-        plots_container.setStyleSheet(
-            """
-            background-color: #f4f4f4;
-            """
-        )
         plots_layout = QGridLayout(plots_container)
-        plots_layout.setContentsMargins(10, 10, 10, 10)
-        plots_layout.setHorizontalSpacing(20)
-        plots_layout.setVerticalSpacing(20)
+        plots_layout.setContentsMargins(5, 5, 5, 5)
+        plots_layout.setHorizontalSpacing(10)
+        plots_layout.setVerticalSpacing(10)
         outer_layout.addWidget(plots_container)
 
-        # Create grid layout for plots
         for idx, (address, name) in enumerate(self.device_info.items()):
-            accel_plot = self.create_plot_widget(f"{name} Accelerometer", -10, 10)
+            accel_plot = self.create_plot_widget(
+                f"{name} Accelerometer", -10, 10, "Acceleration (m/s²)"
+            )
             plots_layout.addWidget(accel_plot, idx, 0)
-
-            gyro_plot = self.create_plot_widget(f"{name} Gyroscope", -1000, 1000)
+            gyro_plot = self.create_plot_widget(
+                f"{name} Gyroscope", -1000, 1000, "Angular Velocity (°/s)"
+            )
             plots_layout.addWidget(gyro_plot, idx, 1)
 
-            # Store plots for updates
-            self.plots[address] = {
-                "accel_x": accel_plot.plot(
-                    pen=pg.mkPen(self.color_palette["plot_lines_x"], width=2),
-                    name="Accel X",
-                ),
-                "accel_y": accel_plot.plot(
-                    pen=pg.mkPen(self.color_palette["plot_lines_y"], width=2),
-                    name="Accel Y",
-                ),
-                "accel_z": accel_plot.plot(
-                    pen=pg.mkPen(self.color_palette["plot_lines_z"], width=2),
-                    name="Accel Z",
-                ),
-                "gyro_x": gyro_plot.plot(
-                    pen=pg.mkPen(self.color_palette["plot_lines_x"], width=2),
-                    name="Gyro X",
-                ),
-                "gyro_y": gyro_plot.plot(
-                    pen=pg.mkPen(self.color_palette["plot_lines_y"], width=2),
-                    name="Gyro Y",
-                ),
-                "gyro_z": gyro_plot.plot(
-                    pen=pg.mkPen(self.color_palette["plot_lines_z"], width=2),
-                    name="Gyro Z",
-                ),
-            }
+            self.plots[address] = {"accel": accel_plot, "gyro": gyro_plot}
 
-    def create_plot_widget(self, title, y_min, y_max):
-        """Creates a single plot widget with the specified title and Y-axis range."""
+    def add_legend_label(self, layout, text, color):
+        label = QLabel(f"{text}:")
+        label.setStyleSheet(
+            f"color: {color}; font-weight: bold; font-size: 16px; font-family: 'Roboto';"
+        )
+        layout.addWidget(label)
+
+    def create_plot_widget(self, title, y_min, y_max, unit):
         plot_item = pg.PlotWidget(title=title)
         plot_item.setYRange(y_min, y_max)
-        plot_item.setXRange(-2, 0)  # Last 2 seconds
-        plot_item.addLegend(offset=(10, 10))
-        plot_item.getAxis("left").setLabel("Value")
-        plot_item.getAxis("bottom").setLabel("Time (s)")
-
+        plot_item.setXRange(-2, 0)  # Display the last 2 seconds of data
+        plot_item.getAxis("left").setLabel(unit)  # Set label for y-axis
+        plot_item.getAxis("bottom").setLabel("Time (s)")  # Set label for x-axis
+        plot_item.getPlotItem().getAxis("left").setStyle(
+            tickFont=pg.QtGui.QFont("Roboto", 10)
+        )
+        plot_item.getPlotItem().getAxis("bottom").setStyle(
+            tickFont=pg.QtGui.QFont("Roboto", 10)
+        )
         return plot_item
 
     def setup_timer(self):
         self.timer = QTimer(self)
         self.timer.timeout.connect(self.update_plots)
-        self.timer.start(50)
+        self.timer.start(50)  # Update the plots every 50 milliseconds
 
     def update_plots(self):
-        """Fetch the latest 2 seconds of data and update plots."""
         current_time = time()
-        for address, plot_data in self.plots.items():
+        for address, plots in self.plots.items():
             if address in self.data:
-                accel_data = self.data[address]["accel"]
-                gyro_data = self.data[address]["gyro"]
+                for sensor_type in ["accel", "gyro"]:
+                    data = self.data[address][sensor_type]
+                    recent_data = data[data[:, 0] >= current_time - 2]
+                    time_data = recent_data[:, 0] - current_time
+                    if recent_data.size > 0:
+                        frequency = len(recent_data) / 2  # Hz calculation
+                        plots[sensor_type].clear()
+                        title_suffix = (
+                            f" ({frequency:.0f} Hz)"  # Frequency to be displayed
+                        )
+                        sensor_name = "Accel" if sensor_type == "accel" else "Gyro"
+                        for i in range(1, 4):  # X, Y, Z data columns
+                            plots[sensor_type].plot(
+                                time_data,
+                                recent_data[:, i],
+                                pen=None,
+                                symbol="o",
+                                symbolSize=6,
+                                symbolBrush=self.color_palette[
+                                    f"plot_lines_{chr(119+i)}"
+                                ],
+                            )
+                        # Update the plot title with the new frequency
+                        plots[sensor_type].setTitle(
+                            f"{self.device_info[address]} {sensor_name} {title_suffix}"
+                        )
 
-                # Filter data for the last 2 seconds
-                recent_accel = accel_data[accel_data[:, 0] >= current_time - 2]
-                recent_gyro = gyro_data[gyro_data[:, 0] >= current_time - 2]
+    def add_legend_icon(self, layout, label, color):
+        pixmap = QPixmap(16, 16)
+        pixmap.fill(QColor(color))
+        icon = QLabel()
+        icon.setPixmap(pixmap)
+        icon.setToolTip(f"{label} axis")  # Optional: tooltip on hover
+        layout.addWidget(icon, alignment=Qt.AlignCenter)
 
-                # Generate timestamps relative to the current time
-                accel_time = recent_accel[:, 0] - current_time
-                gyro_time = recent_gyro[:, 0] - current_time
-
-                # Update accelerometer plots
-                if recent_accel.size > 0:
-                    plot_data["accel_x"].setData(accel_time, recent_accel[:, 1])
-                    plot_data["accel_y"].setData(accel_time, recent_accel[:, 2])
-                    plot_data["accel_z"].setData(accel_time, recent_accel[:, 3])
-
-                # Update gyroscope plots
-                if recent_gyro.size > 0:
-                    plot_data["gyro_x"].setData(gyro_time, recent_gyro[:, 1])
-                    plot_data["gyro_y"].setData(gyro_time, recent_gyro[:, 2])
-                    plot_data["gyro_z"].setData(gyro_time, recent_gyro[:, 3])
+        text = QLabel(label)
+        text.setStyleSheet(
+            f"color: {color}; font-weight: bold; font-size: 16px; font-family: 'Roboto';"
+        )
+        layout.addWidget(text, alignment=Qt.AlignCenter)

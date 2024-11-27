@@ -3,7 +3,6 @@ from PyQt5.QtWidgets import (
     QWidget,
     QVBoxLayout,
     QGridLayout,
-    QPushButton,
     QHBoxLayout,
     QLabel,
     QFrame,
@@ -78,9 +77,6 @@ class GUIJump(QWidget):
                 }
             row += 1
 
-        # Add navigation buttons
-        self.add_navigation_buttons()
-
     def create_plot(self, title, y_min, y_max):
         plot = pg.PlotWidget(title=title)
         plot.addLegend(offset=(10, 10))
@@ -89,16 +85,6 @@ class GUIJump(QWidget):
         plot.getAxis("left").setLabel("Value")
         plot.getAxis("bottom").setLabel("Time (samples)")
         return plot
-
-    def add_navigation_buttons(self):
-        button_layout = QHBoxLayout()
-        prev_button = QPushButton("Previous Jump")
-        next_button = QPushButton("Next Jump")
-        prev_button.clicked.connect(lambda: self.change_jump(-1))
-        next_button.clicked.connect(lambda: self.change_jump(1))
-        button_layout.addWidget(prev_button)
-        button_layout.addWidget(next_button)
-        self.layout.addLayout(button_layout)
 
     def change_jump(self, direction):
         self.curr_jump_idx = max(

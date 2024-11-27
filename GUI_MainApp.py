@@ -4,6 +4,7 @@ from PyQt5.QtWidgets import (
     QHBoxLayout,
     QLabel,
     QWidget,
+    QPushButton,
 )
 from PyQt5.QtCore import Qt, pyqtSignal
 from GUI_Connecting import GUIConnecting
@@ -127,6 +128,16 @@ class MainApp(QWidget):
             """
         )
         return placeholder
+
+    def add_navigation_buttons(self):
+        button_layout = QHBoxLayout()
+        prev_button = QPushButton("Previous Jump")
+        next_button = QPushButton("Next Jump")
+        prev_button.clicked.connect(lambda: self.change_jump(-1))
+        next_button.clicked.connect(lambda: self.change_jump(1))
+        button_layout.addWidget(prev_button)
+        button_layout.addWidget(next_button)
+        self.layout.addLayout(button_layout)
 
     def show_dashboard(self):
         # Remove the connecting widget
