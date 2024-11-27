@@ -36,9 +36,10 @@ class MainApp(QWidget):
     # Signal to indicate when the dashboard is ready to be shown
     dashboard_ready = pyqtSignal()
 
-    def __init__(self, device_info, jumps):
+    def __init__(self, device_info, data, jumps):
         super().__init__()
         self.device_info = device_info
+        self.data = data
         self.jumps = jumps
         self.color_palette = COLORS  # Store the color palette
         self.setWindowTitle("JumpCoach - Sara and Michael")
@@ -74,7 +75,9 @@ class MainApp(QWidget):
         self.jump_widget = GUIJump(self.color_palette, self.jumps, self.metrics_widget)
 
         # Create live plots widget
-        self.live_plots_widget = GUILivePlots(self.device_info, self.color_palette)
+        self.live_plots_widget = GUILivePlots(
+            self.color_palette, self.device_info, self.data
+        )
 
         # Right-side container for metrics and placeholder
         right_panel = QWidget()
