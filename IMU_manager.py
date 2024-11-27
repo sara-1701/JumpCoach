@@ -70,7 +70,7 @@ class IMUDataThread(QThread):
     def configure_device(self):
         try:
             # Configure accelerometer
-            libmetawear.mbl_mw_acc_set_odr(self.device.board, 100.0)
+            libmetawear.mbl_mw_acc_set_odr(self.device.board, 200.0)
             libmetawear.mbl_mw_acc_set_range(self.device.board, 6.0)
             libmetawear.mbl_mw_acc_write_acceleration_config(self.device.board)
             acc_signal = libmetawear.mbl_mw_acc_get_acceleration_data_signal(
@@ -79,7 +79,7 @@ class IMUDataThread(QThread):
 
             # Configure gyroscope
             libmetawear.mbl_mw_gyro_bmi160_set_odr(
-                self.device.board, cbindings.GyroBoschOdr._100Hz
+                self.device.board, cbindings.GyroBoschOdr._200Hz
             )
             libmetawear.mbl_mw_gyro_bmi160_set_range(
                 self.device.board, cbindings.GyroBoschRange._1000dps

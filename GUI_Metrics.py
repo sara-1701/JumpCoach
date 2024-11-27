@@ -63,7 +63,6 @@ class GUIMetrics(QWidget):
         self.update_metrics_table(0)
 
     def update_metrics_table(self, jump_idx):
-        print("UPDATE METRICS TABLE")
         """Update the metrics table to show the metrics of the selected jump."""
         self.curr_jump_idx = jump_idx
         if 0 <= jump_idx < len(self.jumps):

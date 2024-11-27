@@ -33,20 +33,20 @@ class Jump:
 class JumpDetectionThread(QThread):
     jump_detected = pyqtSignal(int)  # Signal to emit Jump object for GUI
 
-    def __init__(self, data_queues, jumps):
+    def __init__(self, device_info, data, jumps):
         super().__init__()
-        self.data_queues = data_queues  # {Device address: (accel_deque, gyro_deque)}
+        self.data = data
+        self.device_info = device_info
         self.jumps = jumps  # Shared list to store jumps
         self.running = True
         self.last_jump_time = -2  # To ensure a 2-second cooldown between jumps
 
     def calculate_velocity(self, acc_data, time_interval=0.01):
         """Calculate velocity by integrating acceleration."""
-        acc_centered = np.array(acc_data) - np.mean(acc_data)  # Remove bias
+        acc_centered = acc_data - np.mean(acc_data)  # Remove bias
         velocity = np.cumsum(acc_centered) * time_interval
         return velocity
 
-    # Function to find takeoff, jump peak, and landing points using velocity
     def find_jump_events_using_velocity(self, velocity):
         takeoff_idx = np.argmax(velocity)
         peak_idx = takeoff_idx + np.argmin(
@@ -61,39 +61,37 @@ class JumpDetectionThread(QThread):
 
     def detect_jumps(self):
         while self.running:
-            if "D9:85:F5:D6:7B:ED" not in self.data_queues:
+            # Check if the lower back IMU data is available
+            if "D9:85:F5:D6:7B:ED" not in self.data:
                 sleep(0.01)
                 continue
 
-            lower_back_data = self.data_queues["D9:85:F5:D6:7B:ED"][
-                0
-            ]  # Acceleration data
+            # Extract the lower back accelerometer data
+            lower_back_accel_data = self.data["D9:85:F5:D6:7B:ED"]["accel"]
 
-            if len(lower_back_data) >= 100:  # At least 1 second of data
+            # Ensure the accelerometer data is not empty
+            if lower_back_accel_data.shape[0] >= 100:  # At least 1 second of data
                 current_time = time()
-                if lower_back_data[-1][0] > 2 and (
+                if lower_back_accel_data[-1, 1] > 2 and (
                     current_time - self.last_jump_time > 2
                 ):
                     print("Jump detected!")
                     self.last_jump_time = current_time
 
-                    # Wait for 3 second to ensure post-jump data is available
-                    sleep(3)
+                    # Wait for 2 seconds to ensure post-jump data is available
+                    sleep(2)
 
-                    # Extract 100 points before and 100 points after the jump
-                    lower_back_acc = list(self.data_queues["D9:85:F5:D6:7B:ED"][0])[
-                        -200:
-                    ]
-                    lower_back_gyro = list(self.data_queues["D9:85:F5:D6:7B:ED"][1])[
-                        -200:
-                    ]
-                    wrist_acc = list(self.data_queues["FA:6C:EB:21:F6:9A"][0])[-200:]
-                    wrist_gyro = list(self.data_queues["FA:6C:EB:21:F6:9A"][1])[-200:]
-                    thigh_acc = list(self.data_queues["CD:36:98:87:7A:4D"][0])[-200:]
-                    thigh_gyro = list(self.data_queues["CD:36:98:87:7A:4D"][1])[-200:]
+                    # Extract the last 200 points (or all available if fewer)
+                    lower_back_acc = lower_back_accel_data[-200:]
+                    wrist_acc = self.data.get("FA:6C:EB:21:F6:9A", {}).get(
+                        "accel", np.zeros((0, 4))
+                    )[-200:]
+                    thigh_acc = self.data.get("CD:36:98:87:7A:4D", {}).get(
+                        "accel", np.zeros((0, 4))
+                    )[-200:]
 
-                    # Get low back x acceleration
-                    lower_back_acc_x = [point[0] for point in lower_back_acc]
+                    # Extract the acceleration X values
+                    lower_back_acc_x = lower_back_acc[:, 1]
                     lower_back_velocity_x = self.calculate_velocity(lower_back_acc_x)
 
                     # Partition Jump
@@ -108,17 +106,21 @@ class JumpDetectionThread(QThread):
                     # Create Jump object
                     jump = Jump(
                         lower_back_acc=lower_back_acc,
-                        lower_back_gyro=lower_back_gyro,
+                        lower_back_gyro=self.data["D9:85:F5:D6:7B:ED"]["gyro"][-200:],
                         wrist_acc=wrist_acc,
-                        wrist_gyro=wrist_gyro,
+                        wrist_gyro=self.data.get("FA:6C:EB:21:F6:9A", {}).get(
+                            "gyro", np.zeros((0, 4))
+                        )[-200:],
                         thigh_acc=thigh_acc,
-                        thigh_gyro=thigh_gyro,
+                        thigh_gyro=self.data.get("CD:36:98:87:7A:4D", {}).get(
+                            "gyro", np.zeros((0, 4))
+                        )[-200:],
                         metrics=metrics,
                         detected_time=current_time,
                         partition=(takeoff_idx, peak_idx, landing_idx),
                     )
-                    self.jumps.append(jump)  # Add to shared list
-                    self.jump_detected.emit(len(self.jumps) - 1)  # Emit jump for GUI
+                    self.jumps.append(jump)
+                    self.jump_detected.emit(len(self.jumps) - 1)
 
             sleep(0.01)  # Control loop rate
 

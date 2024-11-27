@@ -72,7 +72,9 @@ class MainApp(QWidget):
         self.metrics_widget = GUIMetrics(self.color_palette, self.jumps)
 
         # Create the jump widget, passing the metrics widget
-        self.jump_widget = GUIJump(self.color_palette, self.jumps, self.metrics_widget)
+        self.jump_widget = GUIJump(
+            self.color_palette, self.device_info, self.jumps, self.metrics_widget
+        )
 
         # Create live plots widget
         self.live_plots_widget = GUILivePlots(

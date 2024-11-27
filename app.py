@@ -31,9 +31,9 @@ for address in device_info:
     sleep(0.1)  # Slight delay to stagger connections
 
 # Start the Jump Detection thread
-# jump_detection_thread = JumpDetectionThread(data, jumps)
-# jump_detection_thread.jump_detected.connect(window.jump_widget.update_jump_plot)
-# jump_detection_thread.start()
+jump_detection_thread = JumpDetectionThread(device_info, data, jumps)
+jump_detection_thread.jump_detected.connect(window.jump_widget.update_jump_plot)
+jump_detection_thread.start()
 
 
 # Run the application
