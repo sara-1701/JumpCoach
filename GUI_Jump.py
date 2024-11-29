@@ -129,12 +129,24 @@ class GUIJump(QWidget):
     def update_jump_plot(self, jump_idx):
         if not (0 <= jump_idx < len(self.jumps)):
             return
+        print(f"Updating plot for jump at index {jump_idx}")
         jump = self.jumps[jump_idx]
-        for key, curves in self.curves.items():
-            sensor_data = getattr(jump, key)
-            curves["x"].setData(sensor_data[:, 0])
-            curves["y"].setData(sensor_data[:, 1])
-            curves["z"].setData(sensor_data[:, 2])
+        # Assume timestamps are in the first column and channels start from the second column
+        for device_key in ["lower_back", "wrist", "thigh"]:
+            for sensor_type in ["acc", "gyro"]:
+                key = f"{device_key}_{sensor_type}"
+                curves = self.curves[key]
+                sensor_data = getattr(jump, key)
+                if sensor_data.size > 0:  # Ensure there is data to plot
+                    # Set the time range to cover the jump duration based on the first and last timestamp
+                    start_time = sensor_data[0, 0]
+                    end_time = sensor_data[-1, 0]
+                    self.plots[key].setXRange(start_time, end_time)
+                    curves["x"].setData(sensor_data[:, 0], sensor_data[:, 1])
+                    curves["y"].setData(sensor_data[:, 0], sensor_data[:, 2])
+                    curves["z"].setData(sensor_data[:, 0], sensor_data[:, 3])
+                else:
+                    print(f"No data available for {key}")
 
         self.update_vertical_lines(jump.partition)
 

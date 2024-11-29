@@ -27,19 +27,110 @@ class Jump:
         self.partition = partition
 
     def __repr__(self):
-        return f"Jump(detected_time={self.detected_time}, height={self.metrics.get('height', 0):.2f})"
+        details = (
+            f"Jump detected at {self.detected_time:.2f} seconds:\n"
+            f"  Height: {self.metrics.get('height', 0):.2f} meters\n"
+            f"  Takeoff, Peak, Landing Indices: {self.partition}\n"
+            f"  Accelerometer Data Points:\n"
+            f"    Lower Back: {self.lower_back_acc.shape[0] if self.lower_back_acc is not None else 0} points\n"
+            f"    Wrist: {self.wrist_acc.shape[0] if self.wrist_acc is not None else 0} points\n"
+            f"    Thigh: {self.thigh_acc.shape[0] if self.thigh_acc is not None else 0} points\n"
+            f"  Gyroscope Data Points:\n"
+            f"    Lower Back: {self.lower_back_gyro.shape[0] if self.lower_back_gyro is not None else 0} points\n"
+            f"    Wrist: {self.wrist_gyro.shape[0] if self.wrist_gyro is not None else 0} points\n"
+            f"    Thigh: {self.thigh_gyro.shape[0] if self.thigh_gyro is not None else 0} points"
+        )
+        return details
 
 
 class JumpDetectionThread(QThread):
-    jump_detected = pyqtSignal(int)  # Signal to emit Jump object for GUI
+    jump_detected = pyqtSignal(int)  # Signal to emit Jump object index for GUI
 
     def __init__(self, device_info, data, jumps):
         super().__init__()
-        self.data = data
         self.device_info = device_info
-        self.jumps = jumps  # Shared list to store jumps
+        self.data = data
+        self.jumps = jumps
         self.running = True
         self.last_jump_time = -2  # To ensure a 2-second cooldown between jumps
+
+    def run(self):
+        self.detect_jumps()
+
+    def detect_jumps(self):
+        while self.running:
+            # Iterate over device information to find 'Lower Back' device
+            for address, device_name in self.device_info.items():
+                if (
+                    device_name == "Lower Back"
+                    and self.data[address]["accel"].shape[0] >= 100
+                ):
+                    accel_data = self.data[address]["accel"]
+                    # Check the last value in the x-direction (second column for 0-index)
+                    if accel_data[-1, 1] > 2 and (time() - self.last_jump_time > 2):
+                        print("Jump detected!")
+                        self.process_detected_jump(address)
+
+            sleep(0.01)  # Slight delay to prevent overloading the CPU
+
+    def process_detected_jump(self, address):
+        current_time = time()
+        self.last_jump_time = current_time
+
+        # Wait for 1.5 seconds after the jump to ensure all post-jump data is available
+        sleep(1.5)
+
+        # Determine the time interval for data extraction
+        jump_time = current_time - 0.5  # Assume the jump happened 0.5 seconds ago
+        pre_jump_time = jump_time - 0.5  # Half a second before the jump
+        post_jump_time = jump_time + 1.5  # One and a half seconds after the jump
+
+        # Prepare data from all devices for the Jump object
+        jump_data = {}
+        for dev_address, dev_name in self.device_info.items():
+            acc_data = self.data[dev_address]["accel"]
+            gyro_data = self.data[dev_address]["gyro"]
+
+            # Extract data from half a second before to 1.5 seconds after the jump
+            acc_window = acc_data[
+                (acc_data[:, 0] >= pre_jump_time) & (acc_data[:, 0] <= post_jump_time)
+            ]
+            gyro_window = gyro_data[
+                (gyro_data[:, 0] >= pre_jump_time) & (gyro_data[:, 0] <= post_jump_time)
+            ]
+
+            jump_data[dev_name] = {
+                "acc": acc_window,
+                "gyro": gyro_window,
+            }
+
+        # Calculate metrics using lower back data
+        lower_back_velocity = self.calculate_velocity(
+            jump_data["Lower Back"]["acc"][
+                :, 1
+            ]  # Assuming index 1 is the acceleration component
+        )
+        takeoff_idx, peak_idx, landing_idx = self.find_jump_events_using_velocity(
+            lower_back_velocity
+        )
+        height = self.calculate_height(lower_back_velocity)
+        metrics = {"height": height}
+
+        # Create Jump object
+        jump = Jump(
+            lower_back_acc=jump_data["Lower Back"]["acc"],
+            lower_back_gyro=jump_data["Lower Back"]["gyro"],
+            wrist_acc=jump_data["Wrist"]["acc"],
+            wrist_gyro=jump_data["Wrist"]["gyro"],
+            thigh_acc=jump_data["Thigh"]["acc"],
+            thigh_gyro=jump_data["Thigh"]["gyro"],
+            metrics=metrics,
+            detected_time=jump_time,  # Use the approximate detected time of the jump
+            partition=(takeoff_idx, peak_idx, landing_idx),
+        )
+        self.jumps.append(jump)
+        print(f"Detected jump: {jump}")
+        self.jump_detected.emit(len(self.jumps) - 1)
 
     def calculate_velocity(self, acc_data, time_interval=0.01):
         """Calculate velocity by integrating acceleration."""
@@ -58,74 +149,6 @@ class JumpDetectionThread(QThread):
     def calculate_height(self, velocity):
         displacement = np.cumsum(velocity) * 0.01
         return max(displacement) - min(displacement)
-
-    def detect_jumps(self):
-        while self.running:
-            # Check if the lower back IMU data is available
-            if "D9:85:F5:D6:7B:ED" not in self.data:
-                sleep(0.01)
-                continue
-
-            # Extract the lower back accelerometer data
-            lower_back_accel_data = self.data["D9:85:F5:D6:7B:ED"]["accel"]
-
-            # Ensure the accelerometer data is not empty
-            if lower_back_accel_data.shape[0] >= 100:  # At least 1 second of data
-                current_time = time()
-                if lower_back_accel_data[-1, 1] > 2 and (
-                    current_time - self.last_jump_time > 2
-                ):
-                    print("Jump detected!")
-                    self.last_jump_time = current_time
-
-                    # Wait for 2 seconds to ensure post-jump data is available
-                    sleep(2)
-
-                    # Extract the last 200 points (or all available if fewer)
-                    lower_back_acc = lower_back_accel_data[-200:]
-                    wrist_acc = self.data.get("FA:6C:EB:21:F6:9A", {}).get(
-                        "accel", np.zeros((0, 4))
-                    )[-200:]
-                    thigh_acc = self.data.get("CD:36:98:87:7A:4D", {}).get(
-                        "accel", np.zeros((0, 4))
-                    )[-200:]
-
-                    # Extract the acceleration X values
-                    lower_back_acc_x = lower_back_acc[:, 1]
-                    lower_back_velocity_x = self.calculate_velocity(lower_back_acc_x)
-
-                    # Partition Jump
-                    takeoff_idx, peak_idx, landing_idx = (
-                        self.find_jump_events_using_velocity(lower_back_velocity_x)
-                    )
-
-                    # Calculate metrics
-                    height = self.calculate_height(lower_back_velocity_x)
-                    metrics = {"height": height}
-
-                    # Create Jump object
-                    jump = Jump(
-                        lower_back_acc=lower_back_acc,
-                        lower_back_gyro=self.data["D9:85:F5:D6:7B:ED"]["gyro"][-200:],
-                        wrist_acc=wrist_acc,
-                        wrist_gyro=self.data.get("FA:6C:EB:21:F6:9A", {}).get(
-                            "gyro", np.zeros((0, 4))
-                        )[-200:],
-                        thigh_acc=thigh_acc,
-                        thigh_gyro=self.data.get("CD:36:98:87:7A:4D", {}).get(
-                            "gyro", np.zeros((0, 4))
-                        )[-200:],
-                        metrics=metrics,
-                        detected_time=current_time,
-                        partition=(takeoff_idx, peak_idx, landing_idx),
-                    )
-                    self.jumps.append(jump)
-                    self.jump_detected.emit(len(self.jumps) - 1)
-
-            sleep(0.01)  # Control loop rate
-
-    def run(self):
-        self.detect_jumps()
 
     def stop(self):
         self.running = False
