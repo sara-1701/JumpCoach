@@ -10,6 +10,19 @@ from PyQt5.QtWidgets import (
 from PyQt5.QtCore import Qt
 
 
+import pyqtgraph as pg
+from PyQt5.QtWidgets import (
+    QWidget,
+    QVBoxLayout,
+    QGridLayout,
+    QLabel,
+    QHBoxLayout,
+    QFrame,
+)
+from PyQt5.QtCore import Qt
+from PyQt5.QtGui import QPixmap, QColor
+
+
 class GUIJump(QWidget):
     def __init__(self, color_palette, device_info, jumps, metrics_widget):
         super().__init__()
@@ -22,45 +35,45 @@ class GUIJump(QWidget):
         self.vertical_lines = {}
         self.curr_jump_idx = 0
 
+        self.init_plots()
+
+    def init_plots(self):
         # Set light mode for pyqtgraph globally
         pg.setConfigOption("background", self.color_palette["plot_bg"])
         pg.setConfigOption("foreground", self.color_palette["plot_fg"])
 
-        self.init_ui()
-        self.init_plots()
-
-    def init_ui(self):
         self.setStyleSheet(
             f"""
             QWidget {{
                 background-color: {self.color_palette['block_bg']};
                 font-size: 18px;
                 font-family: 'Roboto', sans-serif;
-                padding: 20px;
-                border: 1px solid #ddd;
+                padding: 10px;
                 border-radius: 10px;
             }}
             """
         )
         self.layout = QVBoxLayout(self)
 
-        # Title for the plots
-        plot_title = QLabel("Jump Analysis", self)
-        plot_title.setAlignment(Qt.AlignCenter)
-        plot_title.setStyleSheet("font-size: 24px; margin: 10px;")
-        self.layout.addWidget(plot_title)
-
-    def init_plots(self):
         grid_layout = QGridLayout()
         self.layout.addLayout(grid_layout)
 
-        row = 0
+        # Create a header with a legend that is centered above the plots
+        header = self.create_header()
+        grid_layout.addWidget(header, 0, 0, 1, 2)  # Span two columns
+
+        row = 1
         for device_key in ["lower_back", "wrist", "thigh"]:
             for sensor_type in ["acc", "gyro"]:
                 plot = self.create_plot(
-                    f"{device_key.capitalize()} {sensor_type.capitalize()}",
-                    -10 if sensor_type == "acc" else -2000,
-                    10 if sensor_type == "acc" else 2000,
+                    f"{device_key.capitalize()} {sensor_type.capitalize()} Data",
+                    -10 if sensor_type == "acc" else -1000,
+                    10 if sensor_type == "acc" else 1000,
+                    (
+                        f"Acceleration (m/s²)"
+                        if sensor_type == "acc"
+                        else "Angular Velocity (°/s)"
+                    ),
                 )
                 grid_layout.addWidget(plot, row, 0 if sensor_type == "acc" else 1)
                 self.plots[f"{device_key}_{sensor_type}"] = plot
@@ -77,20 +90,41 @@ class GUIJump(QWidget):
                 }
             row += 1
 
-    def create_plot(self, title, y_min, y_max):
+    def create_plot(self, title, y_min, y_max, unit):
         plot = pg.PlotWidget(title=title)
-        plot.addLegend(offset=(10, 10))
         plot.setYRange(y_min, y_max)
-        plot.setXRange(0, 200)  # Last 200 samples assuming 100 Hz sampling
-        plot.getAxis("left").setLabel("Value")
-        plot.getAxis("bottom").setLabel("Time (samples)")
+        plot.setXRange(0, 2)  # Display 2 seconds of data
+        plot.getAxis("left").setLabel(unit)
+        plot.getAxis("bottom").setLabel("Time (s)")
+        plot.setFixedWidth(400)  # Match the width of the live plots
         return plot
 
-    def change_jump(self, direction):
-        self.curr_jump_idx = max(
-            0, min(len(self.jumps) - 1, self.curr_jump_idx + direction)
+    def create_header(self):
+        header = QFrame()
+        header_layout = QHBoxLayout(header)
+        header_layout.setContentsMargins(0, 0, 0, 0)
+        header_layout.setAlignment(Qt.AlignCenter)
+
+        # Add the legend similar to live plots
+        self.add_legend_icon(header_layout, "X", self.color_palette["plot_lines_x"])
+        self.add_legend_icon(header_layout, "Y", self.color_palette["plot_lines_y"])
+        self.add_legend_icon(header_layout, "Z", self.color_palette["plot_lines_z"])
+
+        return header
+
+    def add_legend_icon(self, layout, label, color):
+        pixmap = QPixmap(16, 16)
+        pixmap.fill(QColor(color))
+        icon = QLabel()
+        icon.setPixmap(pixmap)
+        icon.setToolTip(f"{label} axis")  # Tooltip on hover
+        layout.addWidget(icon, alignment=Qt.AlignCenter)
+
+        text = QLabel(label)
+        text.setStyleSheet(
+            f"color: {color}; font-weight: bold; font-size: 16px; font-family: 'Roboto';"
         )
-        self.update_jump_plot(self.curr_jump_idx)
+        layout.addWidget(text, alignment=Qt.AlignCenter)
 
     def update_jump_plot(self, jump_idx):
         if not (0 <= jump_idx < len(self.jumps)):
@@ -103,6 +137,12 @@ class GUIJump(QWidget):
             curves["z"].setData(sensor_data[:, 2])
 
         self.update_vertical_lines(jump.partition)
+
+    def change_jump(self, direction):
+        self.curr_jump_idx = max(
+            0, min(len(self.jumps) - 1, self.curr_jump_idx + direction)
+        )
+        self.update_jump_plot(self.curr_jump_idx)
 
     def update_vertical_lines(self, partition):
         for plot_key, plot in self.plots.items():

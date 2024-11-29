@@ -1,7 +1,7 @@
 from PyQt5.QtWidgets import QApplication
-from GUI_MainApp import MainApp
-from IMU_manager import IMUDataThread
-from jump_detection import JumpDetectionThread
+from GUI_MainApp import *
+from IMU_manager import *
+from jump_detection import *
 from time import sleep
 
 # Define device information
@@ -32,7 +32,9 @@ for address in device_info:
 
 # Start the Jump Detection thread
 jump_detection_thread = JumpDetectionThread(device_info, data, jumps)
-jump_detection_thread.jump_detected.connect(window.jump_widget.update_jump_plot)
+jump_detection_thread.jump_detected.connect(
+    window.jump_analyzer.selector_widget.update_ui
+)
 jump_detection_thread.start()
 
 

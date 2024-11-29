@@ -11,6 +11,7 @@ from GUI_Connecting import GUIConnecting
 from GUI_LivePlots import GUILivePlots
 from GUI_Jump import GUIJump
 from GUI_Metrics import GUIMetrics
+from GUI_Selector import *
 
 
 # Define Google color palette
@@ -33,6 +34,98 @@ COLORS = {
 }
 
 
+from PyQt5.QtWidgets import QTabWidget, QVBoxLayout, QLabel, QWidget, QHBoxLayout
+
+
+class JumpAnalyzer(QWidget):
+    """Component to encapsulate JumpGUI, GUIMetrics, Dynamic Jump Selector, and Feedback."""
+
+    def __init__(
+        self, color_palette, jumps, jump_widget, metrics_widget, feedback_widget
+    ):
+        super().__init__()
+        self.color_palette = color_palette
+        self.jumps = jumps
+        self.jump_widget = jump_widget
+        self.metrics_widget = metrics_widget
+        self.feedback_widget = feedback_widget
+
+        # Main layout
+        self.layout = QVBoxLayout(self)
+        self.layout.setContentsMargins(0, 0, 0, 0)
+
+        # Container for the entire JumpAnalyzer box
+        container = QWidget()
+        container.setStyleSheet(
+            f"""
+            background-color: {color_palette['block_bg']};
+            border-radius: 10px;
+            padding: 10px;
+            """
+        )
+        container_layout = QVBoxLayout(container)
+        container_layout.setContentsMargins(10, 10, 10, 10)
+
+        # Title (inside the container)
+        title_label = QLabel("Jump Analyzer")
+        title_label.setAlignment(Qt.AlignCenter)
+        title_label.setStyleSheet(
+            f"""
+            font-size: 20px;
+            font-weight: bold;
+            color: {color_palette['black']};
+            """
+        )
+        container_layout.addWidget(title_label)
+
+        # JumpGUI (on the left side, larger)
+        main_layout = QHBoxLayout()
+        main_layout.addWidget(jump_widget, stretch=2)
+
+        # Right panel (selector, metrics, and feedback)
+        right_panel = QVBoxLayout()
+
+        # GUISelector component (manages the dynamic selection of jumps)
+        self.selector_widget = GUISelector(
+            self.color_palette,
+            self.jumps,
+            jump_widget,
+            metrics_widget,
+        )
+        right_panel.addWidget(
+            self.selector_widget, stretch=1
+        )  # Ensure it takes appropriate space
+
+        # Add metrics widget below the selector area
+        right_panel.addWidget(metrics_widget, stretch=1)
+
+        # Feedback component (below metrics)
+        self.feedback_widget = self.create_feedback_widget()
+        right_panel.addWidget(self.feedback_widget)
+
+        # Add JumpGUI and right panel to container
+        main_layout.addLayout(right_panel)
+        container_layout.addLayout(main_layout)
+
+        # Add the container to the main layout
+        self.layout.addWidget(container)
+
+    def create_feedback_widget(self):
+        """Create the feedback widget (initially empty)."""
+        feedback = QLabel("Feedback: (To be implemented)")
+        feedback.setAlignment(Qt.AlignCenter)
+        feedback.setStyleSheet(
+            f"""
+            background-color: {self.color_palette['grey']};
+            border-radius: 5px;
+            padding: 10px;
+            font-size: 16px;
+            color: {self.color_palette['dark_grey']};
+            """
+        )
+        return feedback
+
+
 class MainApp(QWidget):
     # Signal to indicate when the dashboard is ready to be shown
     dashboard_ready = pyqtSignal()
@@ -51,7 +144,7 @@ class MainApp(QWidget):
         self.setStyleSheet(f"background-color: {COLORS['app_bg']};")  # App background
 
         # Main layout
-        self.main_layout = QVBoxLayout(self)
+        self.main_layout = QHBoxLayout(self)
         self.connecting_widget = GUIConnecting(self.device_info, self.color_palette)
         self.main_layout.addWidget(self.connecting_widget)
 
@@ -66,51 +159,35 @@ class MainApp(QWidget):
         screen_width = QApplication.primaryScreen().size().width()
         panel_width = screen_width // 3  # Divide into thirds
 
-        # Create the main horizontal layout for the dashboard
-        self.dashboard_layout = QHBoxLayout()
-
-        # Create metrics widget first
-        self.metrics_widget = GUIMetrics(self.color_palette, self.jumps)
-
-        # Create the jump widget, passing the metrics widget
-        self.jump_widget = GUIJump(
-            self.color_palette, self.device_info, self.jumps, self.metrics_widget
-        )
-
         # Create live plots widget
         self.live_plots_widget = GUILivePlots(
             self.color_palette, self.device_info, self.data
         )
+        self.live_plots_widget.setFixedWidth(panel_width)
 
-        # Right-side container for metrics and placeholder
-        right_panel = QWidget()
-        right_layout = QVBoxLayout()
-        right_panel.setLayout(right_layout)
-
+        # Create metrics, jump, and placeholder widgets
+        self.metrics_widget = GUIMetrics(self.color_palette, self.jumps)
+        self.jump_widget = GUIJump(
+            self.color_palette, self.device_info, self.jumps, self.metrics_widget
+        )
         self.placeholder_widget = self.create_placeholder("Panel Placeholder")
 
-        # Add metrics and placeholder to the right layout
-        right_layout.addWidget(self.metrics_widget)
-        right_layout.addWidget(self.placeholder_widget)
+        # Create the JumpAnalyzer component
+        self.jump_analyzer = JumpAnalyzer(
+            self.color_palette,
+            self.jumps,
+            self.jump_widget,
+            self.metrics_widget,
+            self.placeholder_widget,
+        )
 
-        # Set fixed widths for the panels
-        self.live_plots_widget.setFixedWidth(panel_width)
-        self.jump_widget.setFixedWidth(panel_width)
-        right_panel.setFixedWidth(panel_width)  # Right panel has the same width
+        # Add widgets to the main layout
+        self.main_layout.addWidget(self.live_plots_widget, stretch=1)
+        self.main_layout.addWidget(self.jump_analyzer, stretch=2)
 
-        # Add widgets to the horizontal layout
-        self.dashboard_layout.addWidget(self.live_plots_widget)
-        self.dashboard_layout.addWidget(self.jump_widget)
-        self.dashboard_layout.addWidget(right_panel)
-
-        # Add the dashboard layout to the main layout
-        self.main_layout.addLayout(self.dashboard_layout)
-
-        # Hide the widgets initially
+        # Hide widgets initially
         self.live_plots_widget.hide()
-        self.jump_widget.hide()
-        self.metrics_widget.hide()
-        self.placeholder_widget.hide()
+        self.jump_analyzer.hide()
 
     def create_placeholder(self, text):
         """Create a placeholder widget with the given text."""
@@ -129,16 +206,6 @@ class MainApp(QWidget):
         )
         return placeholder
 
-    def add_navigation_buttons(self):
-        button_layout = QHBoxLayout()
-        prev_button = QPushButton("Previous Jump")
-        next_button = QPushButton("Next Jump")
-        prev_button.clicked.connect(lambda: self.change_jump(-1))
-        next_button.clicked.connect(lambda: self.change_jump(1))
-        button_layout.addWidget(prev_button)
-        button_layout.addWidget(next_button)
-        self.layout.addLayout(button_layout)
-
     def show_dashboard(self):
         # Remove the connecting widget
         self.main_layout.removeWidget(self.connecting_widget)
@@ -146,9 +213,7 @@ class MainApp(QWidget):
 
         # Show the dashboard widgets
         self.live_plots_widget.show()
-        self.jump_widget.show()
-        self.metrics_widget.show()
-        self.placeholder_widget.show()
+        self.jump_analyzer.show()
 
         # Emit the dashboard ready signal if needed
         self.dashboard_ready.emit()
