@@ -20,10 +20,8 @@ class GUIMetrics(QWidget):
         self.setStyleSheet(
             f"""
             background-color: {color_palette['block_bg']};
-            font-size: 18px;
-            font-family: 'Roboto', sans-serif;
             padding: 20px;
-            border: 1px solid {color_palette['dark_grey']};
+            border: 1px solid {color_palette['grey']};
             border-radius: 10px;
             """
         )
@@ -35,13 +33,7 @@ class GUIMetrics(QWidget):
         # Title for the metrics panel
         self.title_label = QLabel("Metrics")
         self.title_label.setAlignment(Qt.AlignCenter)
-        self.title_label.setStyleSheet(
-            f"""
-            font-size: 20px;
-            font-weight: bold;
-            color: {color_palette['black']};
-            """
-        )
+        self.title_label.setStyleSheet("font-size: 28px; font-family: 'Roboto';")
         self.layout.addWidget(self.title_label)
 
         # Table to display metrics
@@ -52,17 +44,35 @@ class GUIMetrics(QWidget):
         self.metrics_table.verticalHeader().setVisible(False)
         self.metrics_table.setStyleSheet(
             f"""
-            font-size: 16px;
-            font-family: 'Roboto', sans-serif;
-            color: {color_palette['black']};
+            QTableWidget {{
+                font-size: 18px;
+                font-family: 'Roboto', sans-serif;
+                color: {color_palette['black']};
+                border: 1px solid {color_palette['grey']};
+                gridline-color: {color_palette['grey']};
+                background-color: {color_palette['white']};
+            }}
+            QHeaderView::section {{
+                background-color: {color_palette['block_bg']};
+                color: {color_palette['black']};
+                font-size: 18px;
+                font-weight: bold;
+                border: none;
+            }}
+            QTableWidget::item {{
+                border: none;
+                border-bottom: 1px solid {color_palette['grey']};
+            }}
             """
         )
+        self.metrics_table.setAlternatingRowColors(True)
+        self.metrics_table.setShowGrid(True)
         self.layout.addWidget(self.metrics_table)
 
         # Initialize the table with the first jump's metrics
-        self.update_metrics_table(0)
+        self.update_metrics_table(0, 0)
 
-    def update_metrics_table(self, jump_idx):
+    def update_metrics_table(self, jump_idx, max_jump_idx):
         print(f"Jump idx in metrics table: {jump_idx}")
         """Update the metrics table to show the metrics of the selected jump."""
         self.curr_jump_idx = jump_idx

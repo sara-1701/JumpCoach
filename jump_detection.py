@@ -44,7 +44,7 @@ class Jump:
 
 
 class JumpDetectionThread(QThread):
-    jump_detected = pyqtSignal(int)  # Signal to emit Jump object index for GUI
+    jump_detected = pyqtSignal(int, int)  # Signal to emit Jump object index for GUI
 
     def __init__(self, device_info, data, jumps):
         super().__init__()
@@ -129,7 +129,10 @@ class JumpDetectionThread(QThread):
         )
         self.jumps.append(jump)
         print(f"Detected jump: {jump}")
-        self.jump_detected.emit(len(self.jumps) - 1)
+        highest_jump_idx = max(
+            range(len(self.jumps)), key=lambda i: self.jumps[i].metrics.get("height", 0)
+        )
+        self.jump_detected.emit(len(self.jumps) - 1, highest_jump_idx)
 
     def calculate_velocity(self, acc_data, time_interval=0.01):
         """Calculate velocity by integrating acceleration."""
