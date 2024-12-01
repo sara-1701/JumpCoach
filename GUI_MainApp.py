@@ -5,6 +5,7 @@ from PyQt5.QtWidgets import (
     QLabel,
     QWidget,
     QPushButton,
+    QScrollArea,
 )
 from PyQt5.QtCore import Qt, pyqtSignal
 from GUI_Connecting import GUIConnecting
@@ -41,7 +42,13 @@ class JumpAnalyzer(QWidget):
     """Component to encapsulate JumpGUI, GUIMetrics, Dynamic Jump Selector, and Feedback."""
 
     def __init__(
-        self, color_palette, jumps, jump_widget, metrics_widget, feedback_widget
+        self,
+        color_palette,
+        jumps,
+        jump_widget,
+        metrics_widget,
+        feedback_widget,
+        panel_width,
     ):
         super().__init__()
         self.color_palette = color_palette
@@ -49,6 +56,7 @@ class JumpAnalyzer(QWidget):
         self.jump_widget = jump_widget
         self.metrics_widget = metrics_widget
         self.feedback_widget = feedback_widget
+        self.panel_width = panel_width
 
         # Main layout
         self.layout = QVBoxLayout(self)
@@ -73,16 +81,26 @@ class JumpAnalyzer(QWidget):
         # Right panel (selector, metrics, and feedback)
         right_panel = QVBoxLayout()
 
-        # GUISelector component (manages the dynamic selection of jumps)
+        # Wrap GUISelector in a QScrollArea
+        scroll_area = QScrollArea()
+        scroll_area.setWidgetResizable(
+            True
+        )  # Allow resizing of content within scroll area
+        scroll_area.setFixedSize(
+            (self.panel_width - 50), 120
+        )  # Set fixed width and height for the scrollable area
         self.selector_widget = GUISelector(
             self.color_palette,
             self.jumps,
             jump_widget,
             metrics_widget,
         )
+        scroll_area.setWidget(
+            self.selector_widget
+        )  # Add GUISelector as the scrollable widget
         right_panel.addWidget(
-            self.selector_widget, stretch=1
-        )  # Ensure it takes appropriate space
+            scroll_area, stretch=1
+        )  # Add the scroll area to the right panel
 
         # Add metrics widget below the selector area
         right_panel.addWidget(metrics_widget, stretch=1)
@@ -174,6 +192,7 @@ class MainApp(QWidget):
             self.jump_widget,
             self.metrics_widget,
             self.feedback_widget,
+            panel_width,
         )
 
         # Add widgets to the main layout

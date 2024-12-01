@@ -177,9 +177,6 @@ class GUIJump(QWidget):
             return
 
         jump = self.jumps[jump_idx]
-        print(
-            f"Updating plot for jump at index {jump_idx} - Detected at {jump.detected_time:.2f} seconds"
-        )
 
         # Iterate over the devices and sensor types
         for device_key, device_name in self.device_info.items():
