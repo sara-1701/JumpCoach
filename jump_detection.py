@@ -6,21 +6,21 @@ from time import sleep, time
 class Jump:
     def __init__(
         self,
-        lower_back_acc,
+        lower_back_accel,
         lower_back_gyro,
-        wrist_acc,
+        wrist_accel,
         wrist_gyro,
-        thigh_acc,
+        thigh_accel,
         thigh_gyro,
         metrics,
         detected_time,
         partition,
     ):
-        self.lower_back_acc = lower_back_acc
+        self.lower_back_accel = lower_back_accel
         self.lower_back_gyro = lower_back_gyro
-        self.wrist_acc = wrist_acc
+        self.wrist_accel = wrist_accel
         self.wrist_gyro = wrist_gyro
-        self.thigh_acc = thigh_acc
+        self.thigh_accel = thigh_accel
         self.thigh_gyro = thigh_gyro
         self.metrics = metrics
         self.detected_time = detected_time
@@ -32,9 +32,9 @@ class Jump:
             f"  Height: {self.metrics.get('height', 0):.2f} meters\n"
             f"  Takeoff, Peak, Landing Indices: {self.partition}\n"
             f"  Accelerometer Data Points:\n"
-            f"    Lower Back: {self.lower_back_acc.shape[0] if self.lower_back_acc is not None else 0} points\n"
-            f"    Wrist: {self.wrist_acc.shape[0] if self.wrist_acc is not None else 0} points\n"
-            f"    Thigh: {self.thigh_acc.shape[0] if self.thigh_acc is not None else 0} points\n"
+            f"    Lower Back: {self.lower_back_accel.shape[0] if self.lower_back_accel is not None else 0} points\n"
+            f"    Wrist: {self.wrist_accel.shape[0] if self.wrist_accel is not None else 0} points\n"
+            f"    Thigh: {self.thigh_accel.shape[0] if self.thigh_accel is not None else 0} points\n"
             f"  Gyroscope Data Points:\n"
             f"    Lower Back: {self.lower_back_gyro.shape[0] if self.lower_back_gyro is not None else 0} points\n"
             f"    Wrist: {self.wrist_gyro.shape[0] if self.wrist_gyro is not None else 0} points\n"
@@ -81,9 +81,8 @@ class JumpDetectionThread(QThread):
         sleep(1.5)
 
         # Determine the time interval for data extraction
-        jump_time = current_time - 0.5  # Assume the jump happened 0.5 seconds ago
-        pre_jump_time = jump_time - 0.5  # Half a second before the jump
-        post_jump_time = jump_time + 1.5  # One and a half seconds after the jump
+        pre_jump_time = current_time - 1  # Half a second before the jump
+        post_jump_time = current_time + 1.5  # One and a half seconds after the jump
 
         # Prepare data from all devices for the Jump object
         jump_data = {}
@@ -118,14 +117,14 @@ class JumpDetectionThread(QThread):
 
         # Create Jump object
         jump = Jump(
-            lower_back_acc=jump_data["Lower Back"]["acc"],
+            lower_back_accel=jump_data["Lower Back"]["acc"],
             lower_back_gyro=jump_data["Lower Back"]["gyro"],
-            wrist_acc=jump_data["Wrist"]["acc"],
+            wrist_accel=jump_data["Wrist"]["acc"],
             wrist_gyro=jump_data["Wrist"]["gyro"],
-            thigh_acc=jump_data["Thigh"]["acc"],
+            thigh_accel=jump_data["Thigh"]["acc"],
             thigh_gyro=jump_data["Thigh"]["gyro"],
             metrics=metrics,
-            detected_time=jump_time,  # Use the approximate detected time of the jump
+            detected_time=current_time,  # Use the approximate detected time of the jump
             partition=(takeoff_idx, peak_idx, landing_idx),
         )
         self.jumps.append(jump)

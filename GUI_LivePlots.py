@@ -31,7 +31,7 @@ class GUILivePlots(QWidget):
 
         outer_frame = QFrame(self)
         outer_frame.setStyleSheet(
-            "background-color: {}; border-radius: 5px;".format(
+            "background-color: {}; border-radius: 10px;".format(
                 self.color_palette["grey"]
             )
         )

@@ -6,8 +6,8 @@ from time import sleep
 
 # Define device information
 device_info = {
-    "D9:85:F5:D6:7B:ED": "Lower Back",
     "FA:6C:EB:21:F6:9A": "Wrist",
+    "D9:85:F5:D6:7B:ED": "Lower Back",
     "CD:36:98:87:7A:4D": "Thigh",
 }
 

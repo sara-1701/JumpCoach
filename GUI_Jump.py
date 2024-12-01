@@ -48,76 +48,122 @@ class GUIJump(QWidget):
                 background-color: {self.color_palette['block_bg']};
                 font-size: 18px;
                 font-family: 'Roboto', sans-serif;
-                padding: 10px;
                 border-radius: 10px;
             }}
             """
         )
         self.layout = QVBoxLayout(self)
+        self.layout.setContentsMargins(5, 5, 5, 5)
 
-        grid_layout = QGridLayout()
-        self.layout.addLayout(grid_layout)
+        # Outer frame for styling consistency
+        outer_frame = QFrame(self)
+        outer_frame.setStyleSheet(
+            f"""
+            background-color: {self.color_palette['grey']};
+            border-radius: 5px;
+            """
+        )
+        outer_layout = QVBoxLayout(outer_frame)
+        outer_layout.setContentsMargins(5, 5, 5, 5)
+        self.layout.addWidget(outer_frame)
 
-        # Create a header with a legend that is centered above the plots
-        header = self.create_header()
-        grid_layout.addWidget(header, 0, 0, 1, 2)  # Span two columns
+        # Header layout for title and legend
+        header_title = QLabel("Jump Data", self)
+        header_title.setAlignment(Qt.AlignCenter)
+        header_title.setStyleSheet(
+            f"""
+            font-size: 28px;
+            font-family: 'Roboto';
+            margin-right: 30px;
+            color: {self.color_palette['plot_fg']};
+            """
+        )
 
-        row = 1
-        for device_key in ["lower_back", "wrist", "thigh"]:
-            for sensor_type in ["acc", "gyro"]:
-                plot = self.create_plot(
-                    f"{device_key.capitalize()} {sensor_type.capitalize()} Data",
-                    -10 if sensor_type == "acc" else -1000,
-                    10 if sensor_type == "acc" else 1000,
-                    (
-                        f"Acceleration (m/s²)"
-                        if sensor_type == "acc"
-                        else "Angular Velocity (°/s)"
-                    ),
-                )
-                grid_layout.addWidget(plot, row, 0 if sensor_type == "acc" else 1)
-                self.plots[f"{device_key}_{sensor_type}"] = plot
-                self.curves[f"{device_key}_{sensor_type}"] = {
-                    "x": plot.plot(
-                        pen=pg.mkPen(self.color_palette["plot_lines_x"], width=2)
-                    ),
-                    "y": plot.plot(
-                        pen=pg.mkPen(self.color_palette["plot_lines_y"], width=2)
-                    ),
-                    "z": plot.plot(
-                        pen=pg.mkPen(self.color_palette["plot_lines_z"], width=2)
-                    ),
-                }
-            row += 1
+        # Header layout for alignment
+        header_layout = QHBoxLayout()
+        outer_layout.addLayout(header_layout)
+        header_layout.addWidget(header_title, alignment=Qt.AlignCenter)
+
+        # Create a legend layout to match live data
+        legend_layout = QHBoxLayout()
+        self.add_legend_icon(legend_layout, "X", self.color_palette["plot_lines_x"])
+        self.add_legend_icon(legend_layout, "Y", self.color_palette["plot_lines_y"])
+        self.add_legend_icon(legend_layout, "Z", self.color_palette["plot_lines_z"])
+        legend_layout.setSpacing(10)  # Match live data legend spacing
+        legend_layout.setContentsMargins(0, 0, 0, 0)  # Match live data padding
+
+        # Add legend to the header layout
+        header_layout.addLayout(legend_layout)
+        header_layout.setAlignment(Qt.AlignCenter)
+
+        # Plot container layout
+        plots_container = QFrame(self)
+        plots_layout = QGridLayout(plots_container)
+        plots_layout.setContentsMargins(5, 5, 5, 5)
+        plots_layout.setHorizontalSpacing(10)
+        plots_layout.setVerticalSpacing(10)
+        outer_layout.addWidget(plots_container)
+
+        # Create plots with identical titles and formatting to live data
+        for idx, (device_key, device_name) in enumerate(self.device_info.items()):
+            accel_plot = self.create_plot(
+                f"{device_name} Accelerometer", -10, 10, "Acceleration (m/s²)"
+            )
+            plots_layout.addWidget(accel_plot, idx, 0)
+            gyro_plot = self.create_plot(
+                f"{device_name} Gyroscope", -1000, 1000, "Angular Velocity (°/s)"
+            )
+            plots_layout.addWidget(gyro_plot, idx, 1)
+
+            # Initialize plots and curves
+            self.plots[device_key] = {"accel": accel_plot, "gyro": gyro_plot}
+            self.curves[f"{device_key}_accel"] = {
+                "x": accel_plot.plot(
+                    pen=pg.mkPen(self.color_palette["plot_lines_x"], width=2)
+                ),
+                "y": accel_plot.plot(
+                    pen=pg.mkPen(self.color_palette["plot_lines_y"], width=2)
+                ),
+                "z": accel_plot.plot(
+                    pen=pg.mkPen(self.color_palette["plot_lines_z"], width=2)
+                ),
+            }
+            self.curves[f"{device_key}_gyro"] = {
+                "x": gyro_plot.plot(
+                    pen=pg.mkPen(self.color_palette["plot_lines_x"], width=2)
+                ),
+                "y": gyro_plot.plot(
+                    pen=pg.mkPen(self.color_palette["plot_lines_y"], width=2)
+                ),
+                "z": gyro_plot.plot(
+                    pen=pg.mkPen(self.color_palette["plot_lines_z"], width=2)
+                ),
+            }
+
+            # Initialize the vertical lines for this device's plots
+            self.vertical_lines[f"{device_key}_accel"] = []
+            self.vertical_lines[f"{device_key}_gyro"] = []
 
     def create_plot(self, title, y_min, y_max, unit):
         plot = pg.PlotWidget(title=title)
         plot.setYRange(y_min, y_max)
-        plot.setXRange(0, 2)  # Display 2 seconds of data
-        plot.getAxis("left").setLabel(unit)
-        plot.getAxis("bottom").setLabel("Time (s)")
-        plot.setFixedWidth(400)  # Match the width of the live plots
+        plot.setXRange(0, 2)  # Display the last 2 seconds of data
+        plot.setMouseEnabled(False, False)  # Disable zooming and panning
+        plot.getAxis("left").setLabel(unit)  # Y-axis label
+        plot.getAxis("bottom").setLabel("Time (s)")  # X-axis label
+        plot.getPlotItem().getAxis("left").setStyle(
+            tickFont=pg.QtGui.QFont("Roboto", 10)
+        )
+        plot.getPlotItem().getAxis("bottom").setStyle(
+            tickFont=pg.QtGui.QFont("Roboto", 10)
+        )
         return plot
-
-    def create_header(self):
-        header = QFrame()
-        header_layout = QHBoxLayout(header)
-        header_layout.setContentsMargins(0, 0, 0, 0)
-        header_layout.setAlignment(Qt.AlignCenter)
-
-        # Add the legend similar to live plots
-        self.add_legend_icon(header_layout, "X", self.color_palette["plot_lines_x"])
-        self.add_legend_icon(header_layout, "Y", self.color_palette["plot_lines_y"])
-        self.add_legend_icon(header_layout, "Z", self.color_palette["plot_lines_z"])
-
-        return header
 
     def add_legend_icon(self, layout, label, color):
         pixmap = QPixmap(16, 16)
         pixmap.fill(QColor(color))
         icon = QLabel()
         icon.setPixmap(pixmap)
-        icon.setToolTip(f"{label} axis")  # Tooltip on hover
         layout.addWidget(icon, alignment=Qt.AlignCenter)
 
         text = QLabel(label)
@@ -129,25 +175,41 @@ class GUIJump(QWidget):
     def update_jump_plot(self, jump_idx):
         if not (0 <= jump_idx < len(self.jumps)):
             return
-        print(f"Updating plot for jump at index {jump_idx}")
-        jump = self.jumps[jump_idx]
-        # Assume timestamps are in the first column and channels start from the second column
-        for device_key in ["lower_back", "wrist", "thigh"]:
-            for sensor_type in ["acc", "gyro"]:
-                key = f"{device_key}_{sensor_type}"
-                curves = self.curves[key]
-                sensor_data = getattr(jump, key)
-                if sensor_data.size > 0:  # Ensure there is data to plot
-                    # Set the time range to cover the jump duration based on the first and last timestamp
-                    start_time = sensor_data[0, 0]
-                    end_time = sensor_data[-1, 0]
-                    self.plots[key].setXRange(start_time, end_time)
-                    curves["x"].setData(sensor_data[:, 0], sensor_data[:, 1])
-                    curves["y"].setData(sensor_data[:, 0], sensor_data[:, 2])
-                    curves["z"].setData(sensor_data[:, 0], sensor_data[:, 3])
-                else:
-                    print(f"No data available for {key}")
 
+        jump = self.jumps[jump_idx]
+        print(
+            f"Updating plot for jump at index {jump_idx} - Detected at {jump.detected_time:.2f} seconds"
+        )
+
+        # Iterate over the devices and sensor types
+        for device_key, device_name in self.device_info.items():
+            for sensor_type in ["accel", "gyro"]:
+                plot_key = f"{device_key}_{sensor_type}"
+                sensor_data = getattr(
+                    jump, f"{device_name.lower().replace(' ', '_')}_{sensor_type}", None
+                )
+
+                if (
+                    sensor_data is not None and sensor_data.size > 0
+                ):  # Ensure data is available
+                    # Retrieve the plot and curves
+                    plot = self.plots[device_key][sensor_type]
+                    curves = self.curves[plot_key]
+
+                    # Subtract detected_time from timestamps
+                    adjusted_time = sensor_data[:, 0] - (jump.detected_time - 0.5)
+
+                    # Plot the adjusted data
+                    curves["x"].setData(adjusted_time, sensor_data[:, 1])
+                    curves["y"].setData(adjusted_time, sensor_data[:, 2])
+                    curves["z"].setData(adjusted_time, sensor_data[:, 3])
+
+                    # Keep X-axis fixed to 0-2 seconds
+                    plot.setXRange(0, 2)
+                else:
+                    print(f"No data available for {plot_key}")
+
+        # Update vertical lines for the current jump
         self.update_vertical_lines(jump.partition)
 
     def change_jump(self, direction):
@@ -157,15 +219,30 @@ class GUIJump(QWidget):
         self.update_jump_plot(self.curr_jump_idx)
 
     def update_vertical_lines(self, partition):
-        for plot_key, plot in self.plots.items():
-            if plot_key in self.vertical_lines:
+        """Update vertical lines for takeoff, peak, and landing indices."""
+        takeoff_idx, peak_idx, landing_idx = partition
+        line_colors = {"takeoff": "yellow", "peak": "orange", "landing": "black"}
+
+        for device_key, device_name in self.device_info.items():
+            for sensor_type in ["accel", "gyro"]:
+                plot_key = f"{device_key}_{sensor_type}"
+
+                # Check if vertical lines were initialized for this plot
+                if plot_key not in self.vertical_lines:
+                    print(f"Warning: Vertical lines not initialized for {plot_key}")
+                    continue
+
+                # Clear existing lines
                 for line in self.vertical_lines[plot_key]:
-                    plot.removeItem(line)
-                self.vertical_lines[plot_key] = []
-                for idx, color_key in zip(partition, ["takeoff", "peak", "landing"]):
-                    color = self.color_palette[f"line_{color_key}"]
+                    self.plots[device_key][sensor_type].removeItem(line)
+                self.vertical_lines[plot_key] = []  # Reset lines
+
+                # Add new lines
+                for idx, color in zip(
+                    [takeoff_idx, peak_idx, landing_idx], line_colors.values()
+                ):
                     vline = pg.InfiniteLine(
                         pos=idx, angle=90, pen=pg.mkPen(color=color, width=2)
                     )
-                    plot.addItem(vline)
+                    self.plots[device_key][sensor_type].addItem(vline)
                     self.vertical_lines[plot_key].append(vline)

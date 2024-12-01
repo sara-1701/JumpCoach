@@ -60,23 +60,11 @@ class JumpAnalyzer(QWidget):
             f"""
             background-color: {color_palette['block_bg']};
             border-radius: 10px;
-            padding: 10px;
+            padding: 0px;
             """
         )
         container_layout = QVBoxLayout(container)
-        container_layout.setContentsMargins(10, 10, 10, 10)
-
-        # Title (inside the container)
-        title_label = QLabel("Jump Analyzer")
-        title_label.setAlignment(Qt.AlignCenter)
-        title_label.setStyleSheet(
-            f"""
-            font-size: 20px;
-            font-weight: bold;
-            color: {color_palette['black']};
-            """
-        )
-        container_layout.addWidget(title_label)
+        container_layout.setContentsMargins(0, 0, 0, 0)
 
         # JumpGUI (on the left side, larger)
         main_layout = QHBoxLayout()
@@ -165,12 +153,19 @@ class MainApp(QWidget):
         )
         self.live_plots_widget.setFixedWidth(panel_width)
 
-        # Create metrics, jump, and placeholder widgets
+        # Create metrics widget
         self.metrics_widget = GUIMetrics(self.color_palette, self.jumps)
+        self.metrics_widget.setFixedWidth(panel_width - 50)
+
+        # Create the Jump Plot widget
         self.jump_widget = GUIJump(
             self.color_palette, self.device_info, self.jumps, self.metrics_widget
         )
-        self.placeholder_widget = self.create_placeholder("Panel Placeholder")
+        self.jump_widget.setFixedWidth(panel_width)
+
+        # Create the Feedback widget
+        self.feedback_widget = self.create_placeholder("Panel Placeholder")
+        self.feedback_widget.setFixedWidth(panel_width - 50)
 
         # Create the JumpAnalyzer component
         self.jump_analyzer = JumpAnalyzer(
@@ -178,7 +173,7 @@ class MainApp(QWidget):
             self.jumps,
             self.jump_widget,
             self.metrics_widget,
-            self.placeholder_widget,
+            self.feedback_widget,
         )
 
         # Add widgets to the main layout
