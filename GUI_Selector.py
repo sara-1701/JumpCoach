@@ -113,7 +113,7 @@ class GUISelector(QWidget):
     def set_button_style(self, button, selected):
         """Set button style based on selection state."""
         base_style = """
-            font-size: 16px;
+            font-size: 24px;
             padding: 12px 24px;
             border-radius: 10px;
             border: 1px solid {border_color};

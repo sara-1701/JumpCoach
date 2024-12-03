@@ -38,6 +38,22 @@ class GUIMetrics(QWidget):
 
         # Ensuring the headers are visible and the table is stretched
         self.metrics_table.horizontalHeader().setStretchLastSection(True)
+        # Style sheet for the table and header
+        self.metrics_table.setStyleSheet(
+            f"""
+            QTableWidget {{
+                color: {self.color_palette['black']};  /* Black text for table entries */
+                background-color: {self.color_palette['white']};  /* White background for table entries */
+                font-size: 22px;
+            }}
+            QHeaderView::section {{
+                background-color: {self.color_palette['blue']};  /* Green background for header */
+                color: {self.color_palette['white']};  /* White text for header */
+                font-size: 24px;  /* Font size for header */
+                font-weight: bold;
+                }}
+            """
+        )
 
     def update_metrics_table(self, jump_idx, max_jump_idx):
         """Update the metrics table to show the selected jump and either PB or Previous PB."""
@@ -49,7 +65,7 @@ class GUIMetrics(QWidget):
         if show_prev_pb:
             # Find the second-highest jump (Previous PB)
             prev_pb_idx = max(
-                (i for i in range(len(self.jumps)) if i != max_jump_idx),
+                (i for i in range(jump_idx) if i != max_jump_idx),
                 key=lambda i: self.jumps[i].metrics.get("height", 0),
             )
 
@@ -77,21 +93,35 @@ class GUIMetrics(QWidget):
 
             # Selected jump value
             selected_value = selected_jump.get(key, "N/A")
-            selected_item = QTableWidgetItem(str(selected_value))
+            if isinstance(selected_value, float):
+                selected_item = QTableWidgetItem(f"{selected_value:.4f}")
+            else:
+                selected_item = QTableWidgetItem(str(selected_value))
             selected_item.setTextAlignment(Qt.AlignCenter)
             self.metrics_table.setItem(row_idx, 1, selected_item)
 
             # PB/Previous PB value
             pb_value = pb_jump.get(key, "N/A")
-            pb_item = QTableWidgetItem(str(pb_value))
+            if isinstance(pb_value, float):
+                pb_item = QTableWidgetItem(f"{pb_value:.4f}")
+            else:
+                pb_item = QTableWidgetItem(str(pb_value))
             pb_item.setTextAlignment(Qt.AlignCenter)
             self.metrics_table.setItem(row_idx, 2, pb_item)
 
-        # Set headers after populating rows
-        pb_label = "Previous PB" if show_prev_pb else "Current PB"
-        self.metrics_table.setColumnCount(3)
+        # Adjust header labels based on PB status
+        current_jump_label = f"Jump #{jump_idx + 1}"
+        if jump_idx == max_jump_idx:
+            current_jump_label += " (PB)"
+
+        pb_label = "Prev. PB" if show_prev_pb else "Curr. PB"
+        if show_prev_pb:
+            pb_label += f" (#{prev_pb_idx + 1})"
+        else:
+            pb_label += f" (#{max_jump_idx + 1})"
+
         self.metrics_table.setHorizontalHeaderLabels(
-            ["Metric", f"Jump #{jump_idx + 1}", pb_label]
+            ["Metric", current_jump_label, pb_label]
         )
 
         # Adjust column widths

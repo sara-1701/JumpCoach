@@ -63,7 +63,7 @@ class JumpAnalyzer(QWidget):
         # Initial placeholder label
         self.placeholder_label = QLabel("Jump!")
         self.placeholder_label.setAlignment(Qt.AlignCenter)
-        self.placeholder_label.setStyleSheet("font-size: 44px; padding: 20px;")
+        self.placeholder_label.setStyleSheet("font-size: 64px; padding: 20px;")
         self.layout.addWidget(self.placeholder_label)
 
         # Container for the entire JumpAnalyzer box (initially hidden)
@@ -89,7 +89,7 @@ class JumpAnalyzer(QWidget):
         # Scrollable selector
         scroll_area = QScrollArea()
         scroll_area.setWidgetResizable(True)
-        scroll_area.setFixedSize((panel_width - 50), 120)
+        scroll_area.setFixedSize((panel_width - 60), 120)
         self.selector_widget = GUISelector(
             self.color_palette,
             self.jumps,
