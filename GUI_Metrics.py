@@ -65,7 +65,7 @@ class GUIMetrics(QWidget):
         if show_prev_pb:
             # Find the second-highest jump (Previous PB)
             prev_pb_idx = max(
-                (i for i in range(jump_idx) if i != max_jump_idx),
+                (i for i in range(jump_idx + 1) if i != max_jump_idx),
                 key=lambda i: self.jumps[i].metrics.get("height", 0),
             )
 

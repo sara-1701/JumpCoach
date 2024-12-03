@@ -173,6 +173,8 @@ class GUIJump(QWidget):
         layout.addWidget(text, alignment=Qt.AlignCenter)
 
     def update_jump_plot(self, jump_idx):
+        self.curr_jump_idx = jump_idx
+        print(f"Jump index: {self.curr_jump_idx}")
         if not (0 <= jump_idx < len(self.jumps)):
             return
 
@@ -209,22 +211,23 @@ class GUIJump(QWidget):
         # Update vertical lines for the current jump
         self.update_vertical_lines(jump.partition)
 
-    def change_jump(self, direction):
-        self.curr_jump_idx = max(
-            0, min(len(self.jumps) - 1, self.curr_jump_idx + direction)
-        )
-        self.update_jump_plot(self.curr_jump_idx)
-
     def update_vertical_lines(self, partition):
-        """Update vertical lines for takeoff, peak, and landing indices."""
-        takeoff_idx, peak_idx, landing_idx = partition
-        line_colors = {"takeoff": "yellow", "peak": "orange", "landing": "black"}
+        """Update dashed vertical lines for takeoff, peak, and landing times."""
+        takeoff_time, peak_time, landing_time = partition
+        time_adjustment = self.jumps[self.curr_jump_idx].detected_time - 0.5
+
+        # Use colors from the palette
+        line_colors = {
+            "takeoff": self.color_palette["line_takeoff"],
+            "peak": self.color_palette["line_peak"],
+            "landing": self.color_palette["line_landing"],
+        }
 
         for device_key, device_name in self.device_info.items():
             for sensor_type in ["accel", "gyro"]:
                 plot_key = f"{device_key}_{sensor_type}"
 
-                # Check if vertical lines were initialized for this plot
+                # Ensure vertical lines array is initialized
                 if plot_key not in self.vertical_lines:
                     print(f"Warning: Vertical lines not initialized for {plot_key}")
                     continue
@@ -234,12 +237,20 @@ class GUIJump(QWidget):
                     self.plots[device_key][sensor_type].removeItem(line)
                 self.vertical_lines[plot_key] = []  # Reset lines
 
-                # Add new lines
-                for idx, color in zip(
-                    [takeoff_idx, peak_idx, landing_idx], line_colors.values()
-                ):
-                    vline = pg.InfiniteLine(
-                        pos=idx, angle=90, pen=pg.mkPen(color=color, width=5)
-                    )
-                    self.plots[device_key][sensor_type].addItem(vline)
-                    self.vertical_lines[plot_key].append(vline)
+                # Adjust times for plotting
+                adjusted_times = [
+                    takeoff_time - time_adjustment,
+                    peak_time - time_adjustment,
+                    landing_time - time_adjustment,
+                ]
+
+                # Add dashed vertical lines at the adjusted times
+                for time, (key, color) in zip(adjusted_times, line_colors.items()):
+                    if 0 <= time <= 2:  # Ensure the line is within the visible range
+                        vline = pg.InfiniteLine(
+                            pos=time,
+                            angle=90,
+                            pen=pg.mkPen(color=color, width=2, style=Qt.DashLine),
+                        )
+                        self.plots[device_key][sensor_type].addItem(vline)
+                        self.vertical_lines[plot_key].append(vline)

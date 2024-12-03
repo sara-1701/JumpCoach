@@ -100,34 +100,26 @@ class JumpDetectionThread(QThread):
             ]
 
             jump_data[dev_name] = {
-                "acc": acc_window,
+                "accel": acc_window,
                 "gyro": gyro_window,
             }
 
-        # Calculate metrics using lower back data
-        lower_back_velocity = self.calculate_velocity(
-            jump_data["Lower Back"]["acc"][
-                :, 1
-            ]  # Assuming index 1 is the acceleration component
-        )
-        takeoff_idx, peak_idx, landing_idx = self.find_jump_events_using_velocity(
-            lower_back_velocity
-        )
-        height = self.calculate_height(lower_back_velocity)
-        metrics = {"height": height}
+        partitions = self.find_jump_events(jump_data)
+        metrics = self.calculate_metrics(jump_data, partitions)
 
         # Create Jump object
         jump = Jump(
-            lower_back_accel=jump_data["Lower Back"]["acc"],
+            lower_back_accel=jump_data["Lower Back"]["accel"],
             lower_back_gyro=jump_data["Lower Back"]["gyro"],
-            wrist_accel=jump_data["Wrist"]["acc"],
+            wrist_accel=jump_data["Wrist"]["accel"],
             wrist_gyro=jump_data["Wrist"]["gyro"],
-            thigh_accel=jump_data["Thigh"]["acc"],
+            thigh_accel=jump_data["Thigh"]["accel"],
             thigh_gyro=jump_data["Thigh"]["gyro"],
-            metrics=metrics,
             detected_time=current_time,  # Use the approximate detected time of the jump
-            partition=(takeoff_idx, peak_idx, landing_idx),
+            metrics=metrics,
+            partition=partitions,
         )
+
         if len(self.jumps) == 0:
             self.first_jump_detected.emit()
         self.jumps.append(jump)
@@ -137,23 +129,37 @@ class JumpDetectionThread(QThread):
         )
         self.jump_detected.emit(len(self.jumps) - 1, highest_jump_idx)
 
-    def calculate_velocity(self, acc_data, time_interval=0.01):
-        """Calculate velocity by integrating acceleration."""
-        acc_centered = acc_data - np.mean(acc_data)  # Remove bias
-        velocity = np.cumsum(acc_centered) * time_interval
-        return velocity
+    def calculate_metrics(self, jump_data, partition):
+        lower_back_velocity = calculate_velocity(jump_data["Lower Back"]["accel"][:, 1])
+        height = calculate_height(lower_back_velocity)
+        return {"height": height}
 
-    def find_jump_events_using_velocity(self, velocity):
+    def find_jump_events(self, jump_data):
+        velocity = calculate_velocity(jump_data["Lower Back"]["accel"][:, 1])
         takeoff_idx = np.argmax(velocity)
         peak_idx = takeoff_idx + np.argmin(
             np.abs(velocity[takeoff_idx : takeoff_idx + 20])
         )
         landing_idx = peak_idx + np.argmin(velocity[peak_idx:])
-        return takeoff_idx, peak_idx, landing_idx
 
-    def calculate_height(self, velocity):
-        displacement = np.cumsum(velocity) * 0.01
-        return max(displacement) - min(displacement)
+        timestamps = jump_data["Lower Back"]["accel"][:, 0]
+        takeoff_time = timestamps[takeoff_idx]
+        peak_time = timestamps[peak_idx]
+        landing_time = timestamps[landing_idx]
+
+        return (takeoff_time, peak_time, landing_time)
 
     def stop(self):
         self.running = False
+
+
+def calculate_velocity(acc_data, time_interval=0.01):
+    """Calculate velocity by integrating acceleration."""
+    acc_centered = acc_data - np.mean(acc_data)  # Remove bias
+    velocity = np.cumsum(acc_centered) * time_interval
+    return velocity
+
+
+def calculate_height(velocity):
+    displacement = np.cumsum(velocity) * 0.01
+    return max(displacement) - min(displacement)

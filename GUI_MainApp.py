@@ -30,6 +30,9 @@ COLORS = {
     "plot_lines_x": "#4285F4",  # X-axis line color
     "plot_lines_y": "#EA4335",  # Y-axis line color
     "plot_lines_z": "#34A853",  # Z-axis line color
+    "line_takeoff": "#FBBC05",
+    "line_peak": "#FBBC05",
+    "line_landing": "#FBBC05",
     "app_bg": "#e0e0e0",  # Light grey for app background
     "block_bg": "#f4f4f4",  # Light grey for plot blocks
 }
