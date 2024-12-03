@@ -239,7 +239,7 @@ class GUIJump(QWidget):
                     [takeoff_idx, peak_idx, landing_idx], line_colors.values()
                 ):
                     vline = pg.InfiniteLine(
-                        pos=idx, angle=90, pen=pg.mkPen(color=color, width=2)
+                        pos=idx, angle=90, pen=pg.mkPen(color=color, width=5)
                     )
                     self.plots[device_key][sensor_type].addItem(vline)
                     self.vertical_lines[plot_key].append(vline)

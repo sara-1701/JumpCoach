@@ -14,84 +14,85 @@ class GUIMetrics(QWidget):
         super().__init__()
         self.color_palette = color_palette
         self.jumps = jumps
-        self.curr_jump_idx = 0  # Index of the currently selected jump
+        self.initialize_metrics_table()
 
-        # Apply styling
-        self.setStyleSheet(
-            f"""
-            background-color: {color_palette['block_bg']};
-            padding: 20px;
-            border: 1px solid {color_palette['grey']};
-            border-radius: 10px;
-            """
-        )
-
+    def initialize_metrics_table(self):
         # Main layout for the metrics widget
         self.layout = QVBoxLayout(self)
-        self.layout.setContentsMargins(10, 10, 10, 10)
 
         # Title for the metrics panel
-        self.title_label = QLabel("Metrics")
+        self.title_label = QLabel("Jump Metrics")
         self.title_label.setAlignment(Qt.AlignCenter)
         self.title_label.setStyleSheet("font-size: 28px; font-family: 'Roboto';")
         self.layout.addWidget(self.title_label)
 
         # Table to display metrics
         self.metrics_table = QTableWidget()
-        self.metrics_table.setColumnCount(2)
-        self.metrics_table.setHorizontalHeaderLabels(["Metric", "Value"])
+        self.layout.addWidget(self.metrics_table)
+        self.metrics_table.setColumnCount(3)  # Number of columns
+        self.metrics_table.setRowCount(1)  # Temporary row count for testing
+        self.metrics_table.setHorizontalHeaderLabels(["", "", ""])
+        self.metrics_table.horizontalHeader().setVisible(True)
         self.metrics_table.horizontalHeader().setSectionResizeMode(QHeaderView.Stretch)
         self.metrics_table.verticalHeader().setVisible(False)
-        self.metrics_table.setStyleSheet(
-            f"""
-            QTableWidget {{
-                font-size: 18px;
-                font-family: 'Roboto', sans-serif;
-                color: {color_palette['black']};
-                border: 1px solid {color_palette['grey']};
-                gridline-color: {color_palette['grey']};
-                background-color: {color_palette['white']};
-            }}
-            QHeaderView::section {{
-                background-color: {color_palette['block_bg']};
-                color: {color_palette['black']};
-                font-size: 18px;
-                font-weight: bold;
-                border: none;
-            }}
-            QTableWidget::item {{
-                border: none;
-                border-bottom: 1px solid {color_palette['grey']};
-            }}
-            """
-        )
-        self.metrics_table.setAlternatingRowColors(True)
-        self.metrics_table.setShowGrid(True)
-        self.layout.addWidget(self.metrics_table)
 
-        # Initialize the table with the first jump's metrics
-        self.update_metrics_table(0, 0)
+        # Ensuring the headers are visible and the table is stretched
+        self.metrics_table.horizontalHeader().setStretchLastSection(True)
 
     def update_metrics_table(self, jump_idx, max_jump_idx):
-        print(f"Jump idx in metrics table: {jump_idx}")
-        """Update the metrics table to show the metrics of the selected jump."""
+        """Update the metrics table to show the selected jump and either PB or Previous PB."""
         self.curr_jump_idx = jump_idx
-        if 0 <= jump_idx < len(self.jumps):
-            jump = self.jumps[jump_idx]
-            metrics = jump.metrics  # Assuming this is a dictionary
 
-            # Clear existing table content
-            self.metrics_table.setRowCount(0)
+        # Determine if the selected jump is the PB
+        show_prev_pb = jump_idx == max_jump_idx and len(self.jumps) > 1
+        prev_pb_idx = None
+        if show_prev_pb:
+            # Find the second-highest jump (Previous PB)
+            prev_pb_idx = max(
+                (i for i in range(len(self.jumps)) if i != max_jump_idx),
+                key=lambda i: self.jumps[i].metrics.get("height", 0),
+            )
 
-            # Populate the table with the metrics
-            for row_idx, (key, value) in enumerate(metrics.items()):
-                self.metrics_table.insertRow(row_idx)
-                metric_item = QTableWidgetItem(key)
-                value_item = QTableWidgetItem(str(value))
+        # Get metrics for selected jump and PB/Previous PB
+        selected_jump = self.jumps[jump_idx].metrics
+        pb_jump = (
+            self.jumps[prev_pb_idx].metrics
+            if show_prev_pb
+            else self.jumps[max_jump_idx].metrics
+        )
 
-                # Align text to center
-                metric_item.setTextAlignment(Qt.AlignCenter)
-                value_item.setTextAlignment(Qt.AlignCenter)
+        # Clear the table rows
+        self.metrics_table.setRowCount(0)  # Clear existing rows only
 
-                self.metrics_table.setItem(row_idx, 0, metric_item)
-                self.metrics_table.setItem(row_idx, 1, value_item)
+        # Populate the table
+        for row_idx, key in enumerate(
+            sorted(set(selected_jump.keys()).union(pb_jump.keys()))
+        ):
+            self.metrics_table.insertRow(row_idx)
+
+            # Metric name
+            metric_item = QTableWidgetItem(key)
+            metric_item.setTextAlignment(Qt.AlignCenter)
+            self.metrics_table.setItem(row_idx, 0, metric_item)
+
+            # Selected jump value
+            selected_value = selected_jump.get(key, "N/A")
+            selected_item = QTableWidgetItem(str(selected_value))
+            selected_item.setTextAlignment(Qt.AlignCenter)
+            self.metrics_table.setItem(row_idx, 1, selected_item)
+
+            # PB/Previous PB value
+            pb_value = pb_jump.get(key, "N/A")
+            pb_item = QTableWidgetItem(str(pb_value))
+            pb_item.setTextAlignment(Qt.AlignCenter)
+            self.metrics_table.setItem(row_idx, 2, pb_item)
+
+        # Set headers after populating rows
+        pb_label = "Previous PB" if show_prev_pb else "Current PB"
+        self.metrics_table.setColumnCount(3)
+        self.metrics_table.setHorizontalHeaderLabels(
+            ["Metric", f"Jump #{jump_idx + 1}", pb_label]
+        )
+
+        # Adjust column widths
+        self.metrics_table.horizontalHeader().setSectionResizeMode(QHeaderView.Stretch)
