@@ -73,7 +73,7 @@ class GUILivePlots(QWidget):
 
         for idx, (address, name) in enumerate(self.device_info.items()):
             accel_plot = self.create_plot_widget(
-                f"{name} Accelerometer", -10, 10, "Acceleration (m/s²)"
+                f"{name} Accelerometer", -10, 10, "Acceleration (g)"
             )
             plots_layout.addWidget(accel_plot, idx, 0)
             gyro_plot = self.create_plot_widget(

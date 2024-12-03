@@ -17,11 +17,23 @@ class Jump:
         partition,
     ):
         self.lower_back_accel = lower_back_accel
+        self.lower_back_vel = take_integral(lower_back_accel)
+        self.lower_back_disp = take_integral(self.lower_back_vel)
         self.lower_back_gyro = lower_back_gyro
+        self.lower_back_ang_disp = take_integral(lower_back_gyro)
+
         self.wrist_accel = wrist_accel
+        self.wrist_vel = take_integral(wrist_accel)
+        self.wrist_disp = take_integral(self.wrist_vel)
         self.wrist_gyro = wrist_gyro
+        self.wrist_ang_disp = take_integral(wrist_gyro)
+
         self.thigh_accel = thigh_accel
+        self.thigh_vel = take_integral(thigh_accel)
+        self.thigh_disp = take_integral(self.thigh_vel)
         self.thigh_gyro = thigh_gyro
+        self.thigh_ang_disp = take_integral(thigh_gyro)
+
         self.metrics = metrics
         self.detected_time = detected_time
         self.partition = partition
@@ -99,15 +111,20 @@ class JumpDetectionThread(QThread):
                 (gyro_data[:, 0] >= pre_jump_time) & (gyro_data[:, 0] <= post_jump_time)
             ]
 
+            # Convert acceleration from g to m/s²
+            acc_window[
+                :, 1:
+            ] *= 9.81  # Applying the conversion factor to all acceleration columns
+
             jump_data[dev_name] = {
                 "accel": acc_window,
                 "gyro": gyro_window,
             }
 
-        partitions = self.find_jump_events(jump_data)
-        metrics = self.calculate_metrics(jump_data, partitions)
+        partition = self.find_jump_events(jump_data)
+        metrics = self.calculate_metrics(jump_data, partition)
 
-        # Create Jump object
+        # Create Jump object with converted acceleration data
         jump = Jump(
             lower_back_accel=jump_data["Lower Back"]["accel"],
             lower_back_gyro=jump_data["Lower Back"]["gyro"],
@@ -115,9 +132,9 @@ class JumpDetectionThread(QThread):
             wrist_gyro=jump_data["Wrist"]["gyro"],
             thigh_accel=jump_data["Thigh"]["accel"],
             thigh_gyro=jump_data["Thigh"]["gyro"],
-            detected_time=current_time,  # Use the approximate detected time of the jump
             metrics=metrics,
-            partition=partitions,
+            detected_time=current_time,  # Use the approximate detected time of the jump
+            partition=partition,
         )
 
         if len(self.jumps) == 0:
@@ -129,20 +146,29 @@ class JumpDetectionThread(QThread):
         )
         self.jump_detected.emit(len(self.jumps) - 1, highest_jump_idx)
 
+    # CALCULATE METRICS --------------------------------------------
     def calculate_metrics(self, jump_data, partition):
-        lower_back_velocity = calculate_velocity(jump_data["Lower Back"]["accel"][:, 1])
-        height = calculate_height(lower_back_velocity)
+        lower_back_velocity_data = take_integral(jump_data["Lower Back"]["accel"])
+        height = calculate_height(lower_back_velocity_data, partition)
         return {"height": height}
 
+    # FIND PARTITIONS-----------------------------------------------
     def find_jump_events(self, jump_data):
-        velocity = calculate_velocity(jump_data["Lower Back"]["accel"][:, 1])
-        takeoff_idx = np.argmax(velocity)
-        peak_idx = takeoff_idx + np.argmin(
-            np.abs(velocity[takeoff_idx : takeoff_idx + 20])
-        )
-        landing_idx = peak_idx + np.argmin(velocity[peak_idx:])
+        # Calculate velocity for the lower back accelerometer
+        velocity_data = take_integral(jump_data["Lower Back"]["accel"])
 
-        timestamps = jump_data["Lower Back"]["accel"][:, 0]
+        # Extract timestamps and vertical (x-axis) velocity
+        timestamps = velocity_data[:, 0]  # First column is timestamps
+        vertical_velocity = velocity_data[:, 1]  # First column is x-axis velocity
+
+        # Find indices for takeoff, peak, and landing
+        takeoff_idx = np.argmax(vertical_velocity)  # Maximum upward velocity
+        peak_idx = takeoff_idx + np.argmin(
+            np.abs(vertical_velocity[takeoff_idx : takeoff_idx + 20])
+        )
+        landing_idx = peak_idx + np.argmin(vertical_velocity[peak_idx:])
+
+        # Get corresponding times
         takeoff_time = timestamps[takeoff_idx]
         peak_time = timestamps[peak_idx]
         landing_time = timestamps[landing_idx]
@@ -153,13 +179,34 @@ class JumpDetectionThread(QThread):
         self.running = False
 
 
-def calculate_velocity(acc_data, time_interval=0.01):
-    """Calculate velocity by integrating acceleration."""
-    acc_centered = acc_data - np.mean(acc_data)  # Remove bias
-    velocity = np.cumsum(acc_centered) * time_interval
-    return velocity
+def take_integral(data):
+    timestamps = data[:, 0]
+    values = data[:, 1:]
+    time_intervals = 2.0 / len(values)
+    values_centered = values - np.mean(values, axis=0)
+    integrated_values = np.cumsum(values_centered, axis=0) * time_intervals
+    return np.column_stack((timestamps, integrated_values))
 
 
-def calculate_height(velocity):
-    displacement = np.cumsum(velocity) * 0.01
+def calculate_height(jump_velocity_data, partition, time_interval=0.01):
+    takeoff_time, _, landing_time = partition
+
+    # Extract the timestamps and velocity components
+    timestamps = jump_velocity_data[:, 0]  # First column is the timestamp
+    vertical_velocity = jump_velocity_data[
+        :, 2
+    ]  # Second column is vy (y-axis velocity)
+
+    # Find the indices for takeoff and landing times
+    takeoff_idx = np.where(timestamps == takeoff_time)[0][0]
+    landing_idx = np.where(timestamps == landing_time)[0][0]
+
+    # Consider only the vertical velocity between takeoff and landing
+    relevant_velocity = vertical_velocity[takeoff_idx : landing_idx + 1]
+
+    # Integrate vertical velocity to compute displacement (height)
+    displacement = np.cumsum(relevant_velocity) * time_interval
+
+    # Height is the maximum displacement achieved during the jump
+    print(f"Displacement: {displacement}")
     return max(displacement) - min(displacement)

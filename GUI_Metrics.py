@@ -59,21 +59,21 @@ class GUIMetrics(QWidget):
         """Update the metrics table to show the selected jump and either PB or Previous PB."""
         self.curr_jump_idx = jump_idx
 
-        # Determine if the selected jump is the PB
-        show_prev_pb = jump_idx == max_jump_idx and len(self.jumps) > 1
+        # Determine Previous PB index if the current jump is the new PB
         prev_pb_idx = None
-        if show_prev_pb:
-            # Find the second-highest jump (Previous PB)
+        if jump_idx == max_jump_idx:
+            # Find the highest jump before the current PB
             prev_pb_idx = max(
-                (i for i in range(jump_idx + 1) if i != max_jump_idx),
+                (i for i in range(len(self.jumps)) if i != max_jump_idx),
                 key=lambda i: self.jumps[i].metrics.get("height", 0),
+                default=None,
             )
 
         # Get metrics for selected jump and PB/Previous PB
         selected_jump = self.jumps[jump_idx].metrics
         pb_jump = (
             self.jumps[prev_pb_idx].metrics
-            if show_prev_pb
+            if jump_idx == max_jump_idx and prev_pb_idx is not None
             else self.jumps[max_jump_idx].metrics
         )
 
@@ -114,11 +114,10 @@ class GUIMetrics(QWidget):
         if jump_idx == max_jump_idx:
             current_jump_label += " (PB)"
 
-        pb_label = "Prev. PB" if show_prev_pb else "Curr. PB"
-        if show_prev_pb:
-            pb_label += f" (#{prev_pb_idx + 1})"
+        if jump_idx == max_jump_idx and prev_pb_idx is not None:
+            pb_label = f"Prev. PB (#{prev_pb_idx + 1})"
         else:
-            pb_label += f" (#{max_jump_idx + 1})"
+            pb_label = f"Curr. PB (#{max_jump_idx + 1})"
 
         self.metrics_table.setHorizontalHeaderLabels(
             ["Metric", current_jump_label, pb_label]

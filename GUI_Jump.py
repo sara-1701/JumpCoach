@@ -6,6 +6,10 @@ from PyQt5.QtWidgets import (
     QHBoxLayout,
     QLabel,
     QFrame,
+    QPushButton,
+    QButtonGroup,
+    QRadioButton,
+    QComboBox,
 )
 from PyQt5.QtCore import Qt
 
@@ -34,6 +38,8 @@ class GUIJump(QWidget):
         self.curves = {}
         self.vertical_lines = {}
         self.curr_jump_idx = 0
+        self.accel_type = "accel"
+        self.gyro_type = "gyro"
 
         self.init_plots()
 
@@ -50,8 +56,30 @@ class GUIJump(QWidget):
                 font-family: 'Roboto', sans-serif;
                 border-radius: 10px;
             }}
+            QComboBox {{
+                padding-left: 15px;  /* Increase left padding */
+                color: {self.color_palette['black']};
+                background-color: {self.color_palette['yellow']};
+                border: 1px solid {self.color_palette['grey']};
+                border-radius: 5px;
+                min-height: 30px;
+            }}
+            QComboBox::drop-down {{
+                subcontrol-origin: padding;
+                subcontrol-position: top right;
+                width: 30px;
+                border-left-width: 1px;
+                border-left-color: {self.color_palette['grey']};
+                border-left-style: solid; /* just a single line on the right */
+                border-top-right-radius: 3px; /* same radius as the QComboBox */
+                border-bottom-right-radius: 3px;
+            }}
+            QComboBox::down-arrow {{
+                image: url(/path/to/arrow.png); /* path to your dropdown arrow image */
+            }}
             """
         )
+
         self.layout = QVBoxLayout(self)
         self.layout.setContentsMargins(5, 5, 5, 5)
 
@@ -96,6 +124,20 @@ class GUIJump(QWidget):
         header_layout.addLayout(legend_layout)
         header_layout.setAlignment(Qt.AlignCenter)
 
+        # Create dropdowns for plot selection
+        accel_dropdown = QComboBox(self)
+        accel_dropdown.addItems(["Accel", "Vel", "Disp"])
+        accel_dropdown.currentTextChanged.connect(self.set_accel_data_type)
+        gyro_dropdown = QComboBox(self)
+        gyro_dropdown.addItems(["Ang Vel", "Ang Disp"])
+        gyro_dropdown.currentTextChanged.connect(self.set_gyro_data_type)
+
+        # Add dropdowns to the header layout
+        # header_layout.addWidget(QLabel(""))
+        header_layout.addWidget(accel_dropdown)
+        # header_layout.addWidget(QLabel(""))
+        header_layout.addWidget(gyro_dropdown)
+
         # Plot container layout
         plots_container = QFrame(self)
         plots_layout = QGridLayout(plots_container)
@@ -107,7 +149,7 @@ class GUIJump(QWidget):
         # Create plots with identical titles and formatting to live data
         for idx, (device_key, device_name) in enumerate(self.device_info.items()):
             accel_plot = self.create_plot(
-                f"{device_name} Accelerometer", -10, 10, "Acceleration (m/s²)"
+                f"{device_name} Accelerometer", -100, 100, "Acceleration (m/s²)"
             )
             plots_layout.addWidget(accel_plot, idx, 0)
             gyro_plot = self.create_plot(
@@ -144,11 +186,25 @@ class GUIJump(QWidget):
             self.vertical_lines[f"{device_key}_accel"] = []
             self.vertical_lines[f"{device_key}_gyro"] = []
 
+    def set_accel_data_type(self, data_type):
+        print(f"Selected accel data type: {data_type}")  # Debug line
+        mapping = {"Accel": "accel", "Vel": "vel", "Disp": "disp"}
+        self.accel_type = mapping.get(
+            data_type, "accel"
+        )  # Fixed typo: self.data_type -> self.accel_type
+        self.update_jump_plot(self.curr_jump_idx)
+
+    def set_gyro_data_type(self, data_type):
+        print(f"Selected gyro data type: {data_type}")  # Debug line
+        mapping = {"Ang Vel": "gyro", "Ang Disp": "ang_disp"}
+        self.gyro_type = mapping.get(data_type, "gyro")
+        self.update_jump_plot(self.curr_jump_idx)
+
     def create_plot(self, title, y_min, y_max, unit):
         plot = pg.PlotWidget(title=title)
         plot.setYRange(y_min, y_max)
-        plot.setXRange(0, 2)  # Display the last 2 seconds of data
-        plot.setMouseEnabled(False, False)  # Disable zooming and panning
+        plot.setXRange(0, 2)  # Display the last 2 seconds of data initially
+        plot.setMouseEnabled(True, True)  # Enable zooming and panning
         plot.getAxis("left").setLabel(unit)  # Y-axis label
         plot.getAxis("bottom").setLabel("Time (s)")  # X-axis label
         plot.getPlotItem().getAxis("left").setStyle(
@@ -158,6 +214,9 @@ class GUIJump(QWidget):
             tickFont=pg.QtGui.QFont("Roboto", 10)
         )
         return plot
+
+    def reset_zoom(self, plot):
+        plot.enableAutoRange()
 
     def add_legend_icon(self, layout, label, color):
         pixmap = QPixmap(16, 16)
@@ -174,42 +233,67 @@ class GUIJump(QWidget):
 
     def update_jump_plot(self, jump_idx):
         self.curr_jump_idx = jump_idx
-        print(f"Jump index: {self.curr_jump_idx}")
         if not (0 <= jump_idx < len(self.jumps)):
             return
-
         jump = self.jumps[jump_idx]
-
-        # Iterate over the devices and sensor types
-        for device_key, device_name in self.device_info.items():
-            for sensor_type in ["accel", "gyro"]:
-                plot_key = f"{device_key}_{sensor_type}"
-                sensor_data = getattr(
-                    jump, f"{device_name.lower().replace(' ', '_')}_{sensor_type}", None
-                )
-
-                if (
-                    sensor_data is not None and sensor_data.size > 0
-                ):  # Ensure data is available
-                    # Retrieve the plot and curves
-                    plot = self.plots[device_key][sensor_type]
-                    curves = self.curves[plot_key]
-
-                    # Subtract detected_time from timestamps
-                    adjusted_time = sensor_data[:, 0] - (jump.detected_time - 0.5)
-
-                    # Plot the adjusted data
-                    curves["x"].setData(adjusted_time, sensor_data[:, 1])
-                    curves["y"].setData(adjusted_time, sensor_data[:, 2])
-                    curves["z"].setData(adjusted_time, sensor_data[:, 3])
-
-                    # Keep X-axis fixed to 0-2 seconds
-                    plot.setXRange(0, 2)
-                else:
-                    print(f"No data available for {plot_key}")
-
-        # Update vertical lines for the current jump
+        self.update_sensor_plots(jump, "accel", self.accel_type)
+        self.update_sensor_plots(jump, "gyro", self.gyro_type)
         self.update_vertical_lines(jump.partition)
+
+    def update_sensor_plots(self, jump, sensor_type, data_type):
+        """Update plots for a specific sensor type (accel or gyro)."""
+        # Define human-readable titles and axis ranges for data types
+        title_mapping = {
+            "accel": "Accel. (m/s²)",
+            "vel": "Vel. (m/s)",
+            "disp": "Disp. (m)",
+            "gyro": "Ang. Vel. (°/s)",
+            "ang_disp": "Ang. Disp. (°)",
+        }
+        axis_ranges = {
+            "accel": (-50, 50),  # Acceleration in m/s²
+            "vel": (-5, 5),  # Velocity in m/s
+            "disp": (-3, 3),  # Displacement in meters
+            "gyro": (-1000, 1000),  # Angular velocity in °/s
+            "ang_disp": (-180, 180),  # Angular displacement in degrees
+        }
+        axis_units = {
+            "accel": "Acceleration (m/s²)",
+            "vel": "Velocity (m/s)",
+            "disp": "Displacement (m)",
+            "gyro": "Angular Velocity (°/s)",
+            "ang_disp": "Angular Displacement (°)",
+        }
+
+        for device_key, device_name in self.device_info.items():
+            plot_key = f"{device_key}_{sensor_type}"
+            sensor_data = getattr(
+                jump, f"{device_name.lower().replace(' ', '_')}_{data_type}", None
+            )
+
+            if sensor_data is not None and sensor_data.size > 0:
+                plot = self.plots[device_key][sensor_type]
+                curves = self.curves[plot_key]
+                adjusted_time = sensor_data[:, 0] - (jump.detected_time - 0.5)
+                curves["x"].setData(adjusted_time, sensor_data[:, 1])
+                curves["y"].setData(adjusted_time, sensor_data[:, 2])
+                curves["z"].setData(adjusted_time, sensor_data[:, 3])
+
+                # Update axis ranges
+                y_min, y_max = axis_ranges.get(data_type, (-100, 100))
+                plot.setYRange(y_min, y_max)
+
+                # Update the plot title
+                plot_title = f"{device_name} {title_mapping.get(data_type, '')}"
+                plot.setTitle(plot_title)
+
+                # Update axis labels
+                plot.getAxis("left").setLabel(axis_units.get(data_type, ""))
+                plot.getAxis("bottom").setLabel("Time (s)")
+
+                plot.setXRange(0, 2)
+            else:
+                print(f"No data available for {plot_key}")
 
     def update_vertical_lines(self, partition):
         """Update dashed vertical lines for takeoff, peak, and landing times."""
