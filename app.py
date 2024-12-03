@@ -35,6 +35,9 @@ jump_detection_thread = JumpDetectionThread(device_info, data, jumps)
 jump_detection_thread.jump_detected.connect(
     window.jump_analyzer.selector_widget.update_ui
 )
+jump_detection_thread.first_jump_detected.connect(
+    lambda: window.jump_analyzer.toggle_ui(True)
+)
 jump_detection_thread.start()
 
 

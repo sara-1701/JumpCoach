@@ -45,6 +45,7 @@ class Jump:
 
 class JumpDetectionThread(QThread):
     jump_detected = pyqtSignal(int, int)  # Signal to emit Jump object index for GUI
+    first_jump_detected = pyqtSignal()
 
     def __init__(self, device_info, data, jumps):
         super().__init__()
@@ -127,6 +128,8 @@ class JumpDetectionThread(QThread):
             detected_time=current_time,  # Use the approximate detected time of the jump
             partition=(takeoff_idx, peak_idx, landing_idx),
         )
+        if len(self.jumps) == 0:
+            self.first_jump_detected.emit()
         self.jumps.append(jump)
         print(f"Detected jump: {jump}")
         highest_jump_idx = max(

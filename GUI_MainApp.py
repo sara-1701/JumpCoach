@@ -39,8 +39,6 @@ from PyQt5.QtWidgets import QTabWidget, QVBoxLayout, QLabel, QWidget, QHBoxLayou
 
 
 class JumpAnalyzer(QWidget):
-    """Component to encapsulate JumpGUI, GUIMetrics, Dynamic Jump Selector, and Feedback."""
-
     def __init__(
         self,
         color_palette,
@@ -62,16 +60,23 @@ class JumpAnalyzer(QWidget):
         self.layout = QVBoxLayout(self)
         self.layout.setContentsMargins(0, 0, 0, 0)
 
-        # Container for the entire JumpAnalyzer box
-        container = QWidget()
-        container.setStyleSheet(
+        # Initial placeholder label
+        self.placeholder_label = QLabel("Jump!")
+        self.placeholder_label.setAlignment(Qt.AlignCenter)
+        self.placeholder_label.setStyleSheet("font-size: 44px; padding: 20px;")
+        self.layout.addWidget(self.placeholder_label)
+
+        # Container for the entire JumpAnalyzer box (initially hidden)
+        self.container = QWidget()
+        self.container.setHidden(True)
+        self.container.setStyleSheet(
             f"""
             background-color: {color_palette['block_bg']};
             border-radius: 10px;
             padding: 0px;
             """
         )
-        container_layout = QVBoxLayout(container)
+        container_layout = QVBoxLayout(self.container)
         container_layout.setContentsMargins(0, 0, 0, 0)
 
         # JumpGUI (on the left side, larger)
@@ -81,40 +86,35 @@ class JumpAnalyzer(QWidget):
         # Right panel (selector, metrics, and feedback)
         right_panel = QVBoxLayout()
 
-        # Wrap GUISelector in a QScrollArea
+        # Scrollable selector
         scroll_area = QScrollArea()
-        scroll_area.setWidgetResizable(
-            True
-        )  # Allow resizing of content within scroll area
-        scroll_area.setFixedSize(
-            (self.panel_width - 50), 120
-        )  # Set fixed width and height for the scrollable area
+        scroll_area.setWidgetResizable(True)
+        scroll_area.setFixedSize((panel_width - 50), 120)
         self.selector_widget = GUISelector(
             self.color_palette,
             self.jumps,
             jump_widget,
             metrics_widget,
         )
-        scroll_area.setWidget(
-            self.selector_widget
-        )  # Add GUISelector as the scrollable widget
-        right_panel.addWidget(
-            scroll_area, stretch=1
-        )  # Add the scroll area to the right panel
+        scroll_area.setWidget(self.selector_widget)
+        right_panel.addWidget(scroll_area, stretch=1)
 
-        # Add metrics widget below the selector area
+        # Metrics and feedback
         right_panel.addWidget(metrics_widget, stretch=1)
+        right_panel.addWidget(self.create_feedback_widget())
 
-        # Feedback component (below metrics)
-        self.feedback_widget = self.create_feedback_widget()
-        right_panel.addWidget(self.feedback_widget)
-
-        # Add JumpGUI and right panel to container
+        # Combine layouts
         main_layout.addLayout(right_panel)
         container_layout.addLayout(main_layout)
+        self.layout.addWidget(self.container)
 
-        # Add the container to the main layout
-        self.layout.addWidget(container)
+    def toggle_ui(self, show_full_ui=False):
+        if show_full_ui:
+            self.placeholder_label.setHidden(True)
+            self.container.setHidden(False)
+        else:
+            self.placeholder_label.setHidden(False)
+            self.container.setHidden(True)
 
     def create_feedback_widget(self):
         """Create the feedback widget (initially empty)."""
