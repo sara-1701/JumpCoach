@@ -77,9 +77,9 @@ class GUIJump(QWidget):
             QComboBox::down-arrow {{
                 width: 10px;
                 height: 10px;
-                color: {self.color_palette['dark_grey']};
+                color: {self.color_palette['black']};
                 text-align: center;
-                content: "▼"; /* Unicode character for down arrow */
+                content: "▼"; 
             }}
             """
         )
@@ -91,7 +91,7 @@ class GUIJump(QWidget):
         outer_frame = QFrame(self)
         outer_frame.setStyleSheet(
             f"""
-            background-color: {self.color_palette['grey']};
+            background-color: {self.color_palette['block_bg']};
             border-radius: 5px;
             """
         )

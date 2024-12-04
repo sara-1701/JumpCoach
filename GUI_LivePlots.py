@@ -32,7 +32,7 @@ class GUILivePlots(QWidget):
         outer_frame = QFrame(self)
         outer_frame.setStyleSheet(
             "background-color: {}; border-radius: 10px;".format(
-                self.color_palette["grey"]
+                self.color_palette["block_bg"]
             )
         )
         outer_layout = QVBoxLayout(outer_frame)

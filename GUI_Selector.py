@@ -19,7 +19,7 @@ class GUISelector(QWidget):
         self.selector_label = None  # Initialize the placeholder label variable
         self.selected_button = None  # Keep track of the currently selected button
         self.highest_jump_button = None
-        self.update_ui(recent_jump_idx=None, highest_jump_idx=None)
+        self.update_ui(recent_jump_idx=0, highest_jump_idx=0)
 
     def update_ui(self, recent_jump_idx, highest_jump_idx):
         # This method is called when the signal is emitted

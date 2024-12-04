@@ -3,6 +3,19 @@ from GUI_MainApp import *
 from IMU_manager import *
 from jump_detection import *
 from time import sleep
+import pickle
+
+
+def load_jump_objects(filename="jumps.pkl"):
+    with open(filename, "rb") as file:
+        jumps = pickle.load(file)
+    return jumps
+
+
+def save_jump_objects(jumps, filename="jumps.pkl"):
+    with open(filename, "wb") as file:
+        pickle.dump(jumps, file)
+
 
 # Define device information
 device_info = {
@@ -14,6 +27,12 @@ device_info = {
 data = {}  # {Device address: (accel_deque, gyro_deque)}
 threads = []  # To manage IMU data threads
 jumps = []
+import_jumps = True
+export_jumps = False
+
+if import_jumps == True:
+    jumps = load_jump_objects()
+    print(f"Imported Jumps: {jumps}")
 
 # Initialize the application
 app = QApplication([])
@@ -31,7 +50,7 @@ for address in device_info:
     sleep(0.1)  # Slight delay to stagger connections
 
 # Start the Jump Detection thread
-jump_detection_thread = JumpDetectionThread(device_info, data, jumps)
+jump_detection_thread = JumpDetectionThread(device_info, data, jumps, import_jumps)
 jump_detection_thread.jump_detected.connect(
     window.jump_analyzer.selector_widget.update_ui
 )
@@ -40,9 +59,13 @@ jump_detection_thread.first_jump_detected.connect(
 )
 jump_detection_thread.start()
 
-
 # Run the application
 app.exec_()
+
+
+if export_jumps == True:
+    jumps = save_jump_objects(jumps)
+    print(f"Exported Jumps: {jumps}")
 
 # Cleanup: stop threads
 for thread in threads:

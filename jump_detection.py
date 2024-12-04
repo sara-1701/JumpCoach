@@ -38,24 +38,30 @@ class Jump:
         self.metrics = self.calculate_metrics()
 
     def __repr__(self):
-        details = f"Jump detected at {self.detected_time:.2f} seconds:\n"
+        details = (
+            f"Jump detected at {self.detected_time:.2f} seconds\n"
+            f"Lower Back - Accel points: {len(self.lower_back_accel)}, Gyro points: {len(self.lower_back_gyro)}\n"
+            f"Wrist - Accel points: {len(self.wrist_accel)}, Gyro points: {len(self.wrist_gyro)}\n"
+            f"Thigh - Accel points: {len(self.thigh_accel)}, Gyro points: {len(self.thigh_gyro)}"
+        )
         return details
 
     # CALCULATE PARTITIONS --------------------------------------------
     def find_jump_events(self):
-        # Calculate velocity for the lower back accelerometer
-        velocity_data = self.lower_back_vel
-
         # Extract timestamps and vertical (x-axis) velocity
-        timestamps = velocity_data[:, 0]  # First column is timestamps
-        vertical_velocity = velocity_data[:, 1]  # First column is x-axis velocity
-
+        timestamps = self.lower_back_vel[:, 0]
+        vertical_velocity = self.lower_back_vel[:, 1]  # x-axis
+        # print(vertical_velocity)
         # Find indices for takeoff, peak, and landing
         takeoff_idx = np.argmax(vertical_velocity)  # Maximum upward velocity
+        # print(takeoff_idx, vertical_velocity[takeoff_idx])
+
+        landing_idx = takeoff_idx + np.argmin(vertical_velocity[takeoff_idx:])
+        # print(landing_idx)
+        # print(vertical_velocity[takeoff_idx:landing_idx])
         peak_idx = takeoff_idx + np.argmin(
-            np.abs(vertical_velocity[takeoff_idx : takeoff_idx + 20])
+            np.abs(vertical_velocity[takeoff_idx:landing_idx])
         )
-        landing_idx = peak_idx + np.argmin(vertical_velocity[peak_idx:])
 
         # Get corresponding times
         takeoff_time = timestamps[takeoff_idx]
@@ -66,27 +72,186 @@ class Jump:
 
     # CALCULATE METRICS --------------------------------------------
     def calculate_metrics(self):
-        height = calculate_height(self.lower_back_vel, self.partition)
-        return {"height": height}
+        """
+        Calculate all jump metrics using available data and partition timestamps.
+        """
+        takeoff_time, peak_time, landing_time = self.partition
+
+        metrics = {
+            "airtime": calculate_airtime(self.partition),
+            "height": calculate_height_from_displacement(
+                self.lower_back_disp, self.partition
+            ),
+            "distance_traveled_x": calculate_distance_traveled(
+                self.lower_back_disp, axis="x"
+            ),
+            "side_movement": calculate_distance_traveled(
+                self.lower_back_disp, axis="y"
+            ),
+            "forward_backward_movement": calculate_distance_traveled(
+                self.lower_back_disp, axis="z"
+            ),
+            "takeoff_max_vertical_arm_speed": calculate_max_speed(
+                self.wrist_vel, "x", 0, takeoff_time
+            ),
+            "rise_max_vertical_arm_speed": calculate_max_speed(
+                self.wrist_vel, "x", takeoff_time, peak_time
+            ),
+            "fall_max_vertical_arm_speed": calculate_max_speed(
+                self.wrist_vel, "x", peak_time, landing_time
+            ),
+            "landing_max_vertical_arm_speed": calculate_max_speed(
+                self.wrist_vel, "x", landing_time, self.wrist_disp[-1][0]
+            ),
+            "takeoff_max_frontal_arm_speed": calculate_max_speed(
+                self.wrist_vel, "y", 0, takeoff_time
+            ),
+            "rise_max_frontal_arm_speed": calculate_max_speed(
+                self.wrist_vel, "y", takeoff_time, peak_time
+            ),
+            "fall_max_frontal_arm_speed": calculate_max_speed(
+                self.wrist_vel, "y", peak_time, landing_time
+            ),
+            "landing_max_frontal_arm_speed": calculate_max_speed(
+                self.wrist_vel, "y", landing_time, self.wrist_disp[-1][0]
+            ),
+            "takeoff_max_lateral_arm_speed": calculate_max_speed(
+                self.wrist_vel, "z", 0, takeoff_time
+            ),
+            "rise_max_lateral_arm_speed": calculate_max_speed(
+                self.wrist_vel, "z", takeoff_time, peak_time
+            ),
+            "fall_max_lateral_arm_speed": calculate_max_speed(
+                self.wrist_vel, "z", peak_time, landing_time
+            ),
+            "landing_max_lateral_arm_speed": calculate_max_speed(
+                self.wrist_vel, "z", landing_time, self.wrist_disp[-1][0]
+            ),
+            "takeoff_avg_vertical_arm_speed": calculate_average_speed(
+                self.wrist_vel, "x", 0, takeoff_time
+            ),
+            "rise_avg_vertical_arm_speed": calculate_average_speed(
+                self.wrist_vel, "x", takeoff_time, peak_time
+            ),
+            "fall_avg_vertical_arm_speed": calculate_average_speed(
+                self.wrist_vel, "x", peak_time, landing_time
+            ),
+            "landing_avg_vertical_arm_speed": calculate_average_speed(
+                self.wrist_vel, "x", landing_time, self.wrist_disp[-1][0]
+            ),
+            "takeoff_avg_frontal_arm_speed": calculate_average_speed(
+                self.wrist_vel, "y", 0, takeoff_time
+            ),
+            "rise_avg_frontal_arm_speed": calculate_average_speed(
+                self.wrist_vel, "y", takeoff_time, peak_time
+            ),
+            "fall_avg_frontal_arm_speed": calculate_average_speed(
+                self.wrist_vel, "y", peak_time, landing_time
+            ),
+            "landing_avg_frontal_arm_speed": calculate_average_speed(
+                self.wrist_vel, "y", landing_time, self.wrist_disp[-1][0]
+            ),
+            "takeoff_avg_lateral_arm_speed": calculate_average_speed(
+                self.wrist_vel, "z", 0, takeoff_time
+            ),
+            "rise_avg_lateral_arm_speed": calculate_average_speed(
+                self.wrist_vel, "z", takeoff_time, peak_time
+            ),
+            "fall_avg_lateral_arm_speed": calculate_average_speed(
+                self.wrist_vel, "z", peak_time, landing_time
+            ),
+            "landing_avg_lateral_arm_speed": calculate_average_speed(
+                self.wrist_vel, "z", landing_time, self.wrist_disp[-1][0]
+            ),
+            "takeoff_vertical_arm_movement": calculate_movement(
+                self.wrist_disp, "x", 0, takeoff_time
+            ),
+            "rise_vertical_arm_movement": calculate_movement(
+                self.wrist_disp, "x", takeoff_time, peak_time
+            ),
+            "fall_vertical_arm_movement": calculate_movement(
+                self.wrist_disp, "x", peak_time, landing_time
+            ),
+            "landing_vertical_arm_movement": calculate_movement(
+                self.wrist_disp, "x", landing_time, self.wrist_disp[-1][0]
+            ),
+            "takeoff_frontal_arm_movement": calculate_movement(
+                self.wrist_disp, "y", 0, takeoff_time
+            ),
+            "rise_frontal_arm_movement": calculate_movement(
+                self.wrist_disp, "y", takeoff_time, peak_time
+            ),
+            "fall_frontal_arm_movement": calculate_movement(
+                self.wrist_disp, "y", peak_time, landing_time
+            ),
+            "landing_frontal_arm_movement": calculate_movement(
+                self.wrist_disp, "y", landing_time, self.wrist_disp[-1][0]
+            ),
+            "takeoff_lateral_arm_movement": calculate_movement(
+                self.wrist_disp, "z", 0, takeoff_time
+            ),
+            "rise_lateral_arm_movement": calculate_movement(
+                self.wrist_disp, "z", takeoff_time, peak_time
+            ),
+            "fall_lateral_arm_movement": calculate_movement(
+                self.wrist_disp, "z", peak_time, landing_time
+            ),
+            "landing_lateral_arm_movement": calculate_movement(
+                self.wrist_disp, "z", landing_time, self.wrist_disp[-1][0]
+            ),
+            "_vertical_arm_movement": calculate_movement(
+                self.wrist_disp, "x", 0, self.wrist_disp[-1][0]
+            ),
+            "_lateral_arm_movement": calculate_movement(
+                self.wrist_disp, "y", 0, self.wrist_disp[-1][0]
+            ),
+            "_frontal_arm_movement": calculate_movement(
+                self.wrist_disp, "z", 0, self.wrist_disp[-1][0]
+            ),
+        }
+
+        return metrics
 
 
 class JumpDetectionThread(QThread):
     jump_detected = pyqtSignal(int, int)  # Signal to emit Jump object index for GUI
     first_jump_detected = pyqtSignal()
 
-    def __init__(self, device_info, data, jumps):
+    def __init__(self, device_info, data, jumps, import_jumps_flag):
         super().__init__()
         self.device_info = device_info
         self.data = data
         self.jumps = jumps
         self.running = True
         self.last_jump_time = -2  # To ensure a 2-second cooldown between jumps
+        self.import_jumps_flag = import_jumps_flag
 
     def run(self):
         self.detect_jumps()
 
     def detect_jumps(self):
         while self.running:
+            if self.import_jumps_flag:
+                self.import_jumps_flag = False
+                print(f"\nRecacluclate jumps")
+                # Recreate each jump object in place to recalculate metrics
+                for i in range(len(self.jumps)):
+                    old_jump = self.jumps[i]
+                    self.jumps[i] = Jump(
+                        lower_back_accel=old_jump.lower_back_accel,
+                        lower_back_gyro=old_jump.lower_back_gyro,
+                        wrist_accel=old_jump.wrist_accel,
+                        wrist_gyro=old_jump.wrist_gyro,
+                        thigh_accel=old_jump.thigh_accel,
+                        thigh_gyro=old_jump.thigh_gyro,
+                        detected_time=old_jump.detected_time,
+                    )
+                self.first_jump_detected.emit()
+                highest_jump_idx = max(
+                    range(len(self.jumps)),
+                    key=lambda i: self.jumps[i].metrics.get("height", 0),
+                )
+                self.jump_detected.emit(len(self.jumps) - 1, highest_jump_idx)
             # Iterate over device information to find 'Lower Back' device
             for address, device_name in self.device_info.items():
                 if (
@@ -151,6 +316,7 @@ class JumpDetectionThread(QThread):
             self.first_jump_detected.emit()
         self.jumps.append(jump)
         print(f"Detected jump: {jump}")
+
         highest_jump_idx = max(
             range(len(self.jumps)), key=lambda i: self.jumps[i].metrics.get("height", 0)
         )
@@ -169,6 +335,19 @@ def take_integral(data):
     values_centered = values - np.mean(values, axis=0)
     integrated_values = np.cumsum(values_centered, axis=0) * time_intervals
     return np.column_stack((timestamps, integrated_values))
+
+
+def calculate_height_from_displacement(lower_back_disp, partition):
+    takeoff_time, _, landing_time = partition
+
+    # Find the indices for takeoff and landing times
+    takeoff_idx = np.where(lower_back_disp[:, 0] == takeoff_time)[0][0]
+    landing_idx = np.where(lower_back_disp[:, 0] == landing_time)[0][0]
+    airtime_lower_back_disp = lower_back_disp[takeoff_idx : landing_idx + 1, :]
+    x_airtime_lower_back_disp = airtime_lower_back_disp[:, 1]
+    y_airtime_lower_back_disp = airtime_lower_back_disp[:, 2]
+    z_airtime_lower_back_disp = airtime_lower_back_disp[:, 3]
+    return np.max(x_airtime_lower_back_disp)
 
 
 def calculate_height(jump_velocity_data, partition):
@@ -200,3 +379,76 @@ def calculate_height(jump_velocity_data, partition):
     # Height is the maximum displacement achieved during the jump
     print(f"Displacement: {displacement}")
     return max(displacement)
+
+
+def calculate_airtime(partition):
+    """
+    Calculate the airtime of the jump based on the partition timestamps.
+    """
+    takeoff_time, _, landing_time = partition
+    return landing_time - takeoff_time
+
+
+def calculate_distance_traveled(lower_back_disp, axis):
+    """
+    Calculate the distance traveled along a specific axis using displacement data.
+    """
+    axis_map = {"x": 1, "y": 2, "z": 3}
+    axis_idx = axis_map.get(axis)
+
+    displacement = lower_back_disp[:, axis_idx]
+    if axis_idx == 1:
+        return max(displacement)
+    return max(displacement) - min(displacement)
+
+
+def calculate_max_speed(velocity, axis, starttime, endtime):
+    """
+    Calculate the arm swing speed along a specific axis and during a specific phase.
+    """
+    axis_map = {"x": 1, "y": 2, "z": 3}
+    axis_idx = axis_map.get(axis)
+
+    # Extract velocities for the phase (assume all velocities during the phase are relevant)
+    timestamps = velocity[:, 0]
+    start_idx = np.abs(timestamps - starttime).argmin()
+    end_idx = np.abs(timestamps - endtime).argmin()
+
+    phase_velocity = velocity[start_idx : end_idx + 1, axis_idx]
+    if len(phase_velocity) == 0:
+        return 0
+    return max(np.abs(phase_velocity))
+
+
+def calculate_average_speed(velocity, axis, starttime, endtime):
+    """
+    Calculate the arm swing speed along a specific axis and during a specific phase.
+    """
+    axis_map = {"x": 1, "y": 2, "z": 3}
+    axis_idx = axis_map.get(axis)
+
+    # Extract velocities for the phase (assume all velocities during the phase are relevant)
+    timestamps = velocity[:, 0]
+    start_idx = np.abs(timestamps - starttime).argmin()
+    end_idx = np.abs(timestamps - endtime).argmin()
+
+    phase_velocity = velocity[start_idx : end_idx + 1, axis_idx]
+    if len(phase_velocity) == 0:
+        return 0
+    return sum(np.abs(phase_velocity)) / len(phase_velocity)
+
+
+def calculate_movement(displacement, axis, starttime, endtime):
+    axis_map = {"x": 1, "y": 2, "z": 3}
+    axis_idx = axis_map.get(axis)
+
+    # Extract velocities for the phase (assume all velocities during the phase are relevant)
+    timestamps = displacement[:, 0]
+    start_idx = np.abs(timestamps - starttime).argmin()
+    end_idx = np.abs(timestamps - endtime).argmin()
+
+    phase_displacement = displacement[start_idx : end_idx + 1, axis_idx]
+    if len(phase_displacement) == 0:
+        return 0
+    total_distance = np.sum(np.abs(np.diff(phase_displacement)))
+    return total_distance

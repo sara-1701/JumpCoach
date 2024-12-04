@@ -5,6 +5,7 @@ from PyQt5.QtWidgets import (
     QTableWidget,
     QTableWidgetItem,
     QHeaderView,
+    QScrollArea,
 )
 from PyQt5.QtCore import Qt
 
@@ -15,6 +16,8 @@ class GUIMetrics(QWidget):
         self.color_palette = color_palette
         self.jumps = jumps
         self.initialize_metrics_table()
+
+    from PyQt5.QtWidgets import QScrollArea
 
     def initialize_metrics_table(self):
         # Main layout for the metrics widget
@@ -28,7 +31,16 @@ class GUIMetrics(QWidget):
 
         # Table to display metrics
         self.metrics_table = QTableWidget()
-        self.layout.addWidget(self.metrics_table)
+
+        # Wrap the table in a QScrollArea
+        self.scroll_area = QScrollArea()
+        self.scroll_area.setWidget(self.metrics_table)
+        self.scroll_area.setWidgetResizable(
+            True
+        )  # Ensures the table resizes with the scroll area
+
+        self.layout.addWidget(self.scroll_area)
+
         self.metrics_table.setColumnCount(3)  # Number of columns
         self.metrics_table.setRowCount(1)  # Temporary row count for testing
         self.metrics_table.setHorizontalHeaderLabels(["", "", ""])
@@ -44,7 +56,7 @@ class GUIMetrics(QWidget):
             QTableWidget {{
                 color: {self.color_palette['black']};  /* Black text for table entries */
                 background-color: {self.color_palette['white']};  /* White background for table entries */
-                font-size: 22px;
+                font-size: 16px;
             }}
             QHeaderView::section {{
                 background-color: {self.color_palette['blue']};  /* Green background for header */
