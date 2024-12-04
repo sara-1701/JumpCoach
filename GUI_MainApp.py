@@ -13,6 +13,7 @@ from GUI_LivePlots import GUILivePlots
 from GUI_Jump import GUIJump
 from GUI_Metrics import GUIMetrics
 from GUI_Selector import *
+from GUI_Feedback import *
 
 
 # Define Google color palette
@@ -104,7 +105,7 @@ class JumpAnalyzer(QWidget):
 
         # Metrics and feedback
         right_panel.addWidget(metrics_widget, stretch=1)
-        right_panel.addWidget(self.create_feedback_widget())
+        right_panel.addWidget(feedback_widget, stretch=1)
 
         # Combine layouts
         main_layout.addLayout(right_panel)
@@ -118,21 +119,6 @@ class JumpAnalyzer(QWidget):
         else:
             self.placeholder_label.setHidden(False)
             self.container.setHidden(True)
-
-    def create_feedback_widget(self):
-        """Create the feedback widget (initially empty)."""
-        feedback = QLabel("Feedback: (To be implemented)")
-        feedback.setAlignment(Qt.AlignCenter)
-        feedback.setStyleSheet(
-            f"""
-            background-color: {self.color_palette['grey']};
-            border-radius: 5px;
-            padding: 10px;
-            font-size: 16px;
-            color: {self.color_palette['dark_grey']};
-            """
-        )
-        return feedback
 
 
 class MainApp(QWidget):
@@ -184,8 +170,8 @@ class MainApp(QWidget):
         )
         self.jump_widget.setFixedWidth(panel_width)
 
-        # Create the Feedback widget
-        self.feedback_widget = self.create_placeholder("Panel Placeholder")
+        # Create the Feedback widget using GUIFeedbackBox
+        self.feedback_widget = GUIFeedbackBox(self.color_palette)
         self.feedback_widget.setFixedWidth(panel_width - 50)
 
         # Create the JumpAnalyzer component
@@ -205,23 +191,6 @@ class MainApp(QWidget):
         # Hide widgets initially
         self.live_plots_widget.hide()
         self.jump_analyzer.hide()
-
-    def create_placeholder(self, text):
-        """Create a placeholder widget with the given text."""
-        placeholder = QLabel(text)
-        placeholder.setAlignment(Qt.AlignCenter)
-        placeholder.setStyleSheet(
-            f"""
-            background-color: {COLORS['grey']};
-            color: {COLORS['dark_grey']};
-            font-size: 16px;
-            font-family: 'Roboto', sans-serif;
-            border: 1px solid {COLORS['dark_grey']};
-            border-radius: 10px;
-            padding: 20px;
-            """
-        )
-        return placeholder
 
     def show_dashboard(self):
         # Remove the connecting widget

@@ -4,6 +4,7 @@ from time import sleep, time
 
 
 class Jump:
+
     def __init__(
         self,
         lower_back_accel,
@@ -12,9 +13,7 @@ class Jump:
         wrist_gyro,
         thigh_accel,
         thigh_gyro,
-        metrics,
         detected_time,
-        partition,
     ):
         self.lower_back_accel = lower_back_accel
         self.lower_back_vel = take_integral(lower_back_accel)
@@ -34,25 +33,41 @@ class Jump:
         self.thigh_gyro = thigh_gyro
         self.thigh_ang_disp = take_integral(thigh_gyro)
 
-        self.metrics = metrics
         self.detected_time = detected_time
-        self.partition = partition
+        self.partition = self.find_jump_events()
+        self.metrics = self.calculate_metrics()
 
     def __repr__(self):
-        details = (
-            f"Jump detected at {self.detected_time:.2f} seconds:\n"
-            f"  Height: {self.metrics.get('height', 0):.2f} meters\n"
-            f"  Takeoff, Peak, Landing Indices: {self.partition}\n"
-            f"  Accelerometer Data Points:\n"
-            f"    Lower Back: {self.lower_back_accel.shape[0] if self.lower_back_accel is not None else 0} points\n"
-            f"    Wrist: {self.wrist_accel.shape[0] if self.wrist_accel is not None else 0} points\n"
-            f"    Thigh: {self.thigh_accel.shape[0] if self.thigh_accel is not None else 0} points\n"
-            f"  Gyroscope Data Points:\n"
-            f"    Lower Back: {self.lower_back_gyro.shape[0] if self.lower_back_gyro is not None else 0} points\n"
-            f"    Wrist: {self.wrist_gyro.shape[0] if self.wrist_gyro is not None else 0} points\n"
-            f"    Thigh: {self.thigh_gyro.shape[0] if self.thigh_gyro is not None else 0} points"
-        )
+        details = f"Jump detected at {self.detected_time:.2f} seconds:\n"
         return details
+
+    # CALCULATE PARTITIONS --------------------------------------------
+    def find_jump_events(self):
+        # Calculate velocity for the lower back accelerometer
+        velocity_data = self.lower_back_vel
+
+        # Extract timestamps and vertical (x-axis) velocity
+        timestamps = velocity_data[:, 0]  # First column is timestamps
+        vertical_velocity = velocity_data[:, 1]  # First column is x-axis velocity
+
+        # Find indices for takeoff, peak, and landing
+        takeoff_idx = np.argmax(vertical_velocity)  # Maximum upward velocity
+        peak_idx = takeoff_idx + np.argmin(
+            np.abs(vertical_velocity[takeoff_idx : takeoff_idx + 20])
+        )
+        landing_idx = peak_idx + np.argmin(vertical_velocity[peak_idx:])
+
+        # Get corresponding times
+        takeoff_time = timestamps[takeoff_idx]
+        peak_time = timestamps[peak_idx]
+        landing_time = timestamps[landing_idx]
+
+        return (takeoff_time, peak_time, landing_time)
+
+    # CALCULATE METRICS --------------------------------------------
+    def calculate_metrics(self):
+        height = calculate_height(self.lower_back_vel, self.partition)
+        return {"height": height}
 
 
 class JumpDetectionThread(QThread):
@@ -121,9 +136,6 @@ class JumpDetectionThread(QThread):
                 "gyro": gyro_window,
             }
 
-        partition = self.find_jump_events(jump_data)
-        metrics = self.calculate_metrics(jump_data, partition)
-
         # Create Jump object with converted acceleration data
         jump = Jump(
             lower_back_accel=jump_data["Lower Back"]["accel"],
@@ -132,9 +144,7 @@ class JumpDetectionThread(QThread):
             wrist_gyro=jump_data["Wrist"]["gyro"],
             thigh_accel=jump_data["Thigh"]["accel"],
             thigh_gyro=jump_data["Thigh"]["gyro"],
-            metrics=metrics,
             detected_time=current_time,  # Use the approximate detected time of the jump
-            partition=partition,
         )
 
         if len(self.jumps) == 0:
@@ -146,34 +156,7 @@ class JumpDetectionThread(QThread):
         )
         self.jump_detected.emit(len(self.jumps) - 1, highest_jump_idx)
 
-    # CALCULATE METRICS --------------------------------------------
-    def calculate_metrics(self, jump_data, partition):
-        lower_back_velocity_data = take_integral(jump_data["Lower Back"]["accel"])
-        height = calculate_height(lower_back_velocity_data, partition)
-        return {"height": height}
-
-    # FIND PARTITIONS-----------------------------------------------
-    def find_jump_events(self, jump_data):
-        # Calculate velocity for the lower back accelerometer
-        velocity_data = take_integral(jump_data["Lower Back"]["accel"])
-
-        # Extract timestamps and vertical (x-axis) velocity
-        timestamps = velocity_data[:, 0]  # First column is timestamps
-        vertical_velocity = velocity_data[:, 1]  # First column is x-axis velocity
-
-        # Find indices for takeoff, peak, and landing
-        takeoff_idx = np.argmax(vertical_velocity)  # Maximum upward velocity
-        peak_idx = takeoff_idx + np.argmin(
-            np.abs(vertical_velocity[takeoff_idx : takeoff_idx + 20])
-        )
-        landing_idx = peak_idx + np.argmin(vertical_velocity[peak_idx:])
-
-        # Get corresponding times
-        takeoff_time = timestamps[takeoff_idx]
-        peak_time = timestamps[peak_idx]
-        landing_time = timestamps[landing_idx]
-
-        return (takeoff_time, peak_time, landing_time)
+    # FIND PARTITIONS----------------------------------------------
 
     def stop(self):
         self.running = False
@@ -182,31 +165,38 @@ class JumpDetectionThread(QThread):
 def take_integral(data):
     timestamps = data[:, 0]
     values = data[:, 1:]
-    time_intervals = 2.0 / len(values)
+    time_intervals = 2.0 / max(len(values), 1)
     values_centered = values - np.mean(values, axis=0)
     integrated_values = np.cumsum(values_centered, axis=0) * time_intervals
     return np.column_stack((timestamps, integrated_values))
 
 
-def calculate_height(jump_velocity_data, partition, time_interval=0.01):
+def calculate_height(jump_velocity_data, partition):
     takeoff_time, _, landing_time = partition
 
     # Extract the timestamps and velocity components
     timestamps = jump_velocity_data[:, 0]  # First column is the timestamp
-    vertical_velocity = jump_velocity_data[
-        :, 2
-    ]  # Second column is vy (y-axis velocity)
+    vertical_velocity = jump_velocity_data[:, 1]
 
     # Find the indices for takeoff and landing times
     takeoff_idx = np.where(timestamps == takeoff_time)[0][0]
     landing_idx = np.where(timestamps == landing_time)[0][0]
 
-    # Consider only the vertical velocity between takeoff and landing
+    # Consider only the vertical velocity and timestamps between takeoff and landing
     relevant_velocity = vertical_velocity[takeoff_idx : landing_idx + 1]
+    relevant_timestamps = timestamps[takeoff_idx : landing_idx + 1]
+    print(f"Relevant timestamps: {[round(i, 20) for i in relevant_timestamps]}")
+    print(f"airtime: : {(relevant_timestamps[-1] - relevant_timestamps[0])}")
+    print(len(relevant_timestamps))
+    # Dynamically calculate the time interval
+    time_interval = (relevant_timestamps[-1] - relevant_timestamps[0]) / (
+        len(relevant_timestamps) - 1
+    )
+    print(f"Calculated Time Interval: {time_interval}")
 
     # Integrate vertical velocity to compute displacement (height)
     displacement = np.cumsum(relevant_velocity) * time_interval
 
     # Height is the maximum displacement achieved during the jump
     print(f"Displacement: {displacement}")
-    return max(displacement) - min(displacement)
+    return max(displacement)

@@ -60,7 +60,7 @@ class GUIJump(QWidget):
                 padding-left: 15px;  /* Increase left padding */
                 color: {self.color_palette['black']};
                 background-color: {self.color_palette['yellow']};
-                border: 1px solid {self.color_palette['grey']};
+                border: 1px solid {self.color_palette['dark_grey']};
                 border-radius: 5px;
                 min-height: 30px;
             }}
@@ -69,13 +69,17 @@ class GUIJump(QWidget):
                 subcontrol-position: top right;
                 width: 30px;
                 border-left-width: 1px;
-                border-left-color: {self.color_palette['grey']};
+                border-left-color: {self.color_palette['dark_grey']};
                 border-left-style: solid; /* just a single line on the right */
                 border-top-right-radius: 3px; /* same radius as the QComboBox */
                 border-bottom-right-radius: 3px;
             }}
             QComboBox::down-arrow {{
-                image: url(/path/to/arrow.png); /* path to your dropdown arrow image */
+                width: 10px;
+                height: 10px;
+                color: {self.color_palette['dark_grey']};
+                text-align: center;
+                content: "▼"; /* Unicode character for down arrow */
             }}
             """
         )
@@ -96,7 +100,7 @@ class GUIJump(QWidget):
         self.layout.addWidget(outer_frame)
 
         # Header layout for title and legend
-        header_title = QLabel("Jump Data", self)
+        header_title = QLabel("Jump Plots", self)
         header_title.setAlignment(Qt.AlignCenter)
         header_title.setStyleSheet(
             f"""
