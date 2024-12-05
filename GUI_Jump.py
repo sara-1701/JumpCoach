@@ -38,7 +38,7 @@ class GUIJump(QWidget):
         self.curves = {}
         self.vertical_lines = {}
         self.curr_jump_idx = 0
-        self.accel_type = "accel"
+        self.accel_type = "vel"
         self.gyro_type = "gyro"
 
         self.init_plots()
@@ -190,7 +190,7 @@ class GUIJump(QWidget):
     def create_plot(self, title, y_min, y_max, unit):
         plot = pg.PlotWidget(title=title)
         plot.setYRange(y_min, y_max)
-        plot.setXRange(0, 2)  # Display the last 2 seconds of data initially
+        plot.setXRange(0, 3)  # Display the last 2 seconds of data initially
         plot.setMouseEnabled(True, True)  # Enable zooming and panning
         plot.getAxis("left").setLabel(unit)  # Y-axis label
         plot.getAxis("bottom").setLabel("Time (s)")  # X-axis label
@@ -261,7 +261,7 @@ class GUIJump(QWidget):
             if sensor_data is not None and sensor_data.size > 0:
                 plot = self.plots[device_key][sensor_type]
                 curves = self.curves[plot_key]
-                adjusted_time = sensor_data[:, 0] - (jump.detected_time - 0.5)
+                adjusted_time = sensor_data[:, 0] - (jump.detected_time - 1.5)
                 curves["x"].setData(adjusted_time, sensor_data[:, 1])
                 curves["y"].setData(adjusted_time, sensor_data[:, 2])
                 curves["z"].setData(adjusted_time, sensor_data[:, 3])
@@ -278,14 +278,14 @@ class GUIJump(QWidget):
                 plot.getAxis("left").setLabel(axis_units.get(data_type, ""))
                 plot.getAxis("bottom").setLabel("Time (s)")
 
-                plot.setXRange(0, 2)
+                plot.setXRange(0, 3)
             else:
                 print(f"No data available for {plot_key}")
 
     def update_vertical_lines(self, partition):
         """Update dashed vertical lines for takeoff, peak, and landing times."""
         takeoff_time, peak_time, landing_time = partition
-        time_adjustment = self.jumps[self.curr_jump_idx].detected_time - 0.5
+        time_adjustment = self.jumps[self.curr_jump_idx].detected_time - 1.5
 
         # Use colors from the palette
         line_colors = {
@@ -317,7 +317,7 @@ class GUIJump(QWidget):
 
                 # Add dashed vertical lines at the adjusted times
                 for time, (key, color) in zip(adjusted_times, line_colors.items()):
-                    if 0 <= time <= 2:  # Ensure the line is within the visible range
+                    if 0 <= time <= 3:  # Ensure the line is within the visible range
                         vline = pg.InfiniteLine(
                             pos=time,
                             angle=90,

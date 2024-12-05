@@ -7,6 +7,7 @@ from PyQt5.QtWidgets import (
     QHeaderView,
 )
 from PyQt5.QtCore import Qt
+from PyQt5.QtGui import QColor
 
 
 class GUIMetrics(QWidget):
@@ -85,7 +86,9 @@ class GUIMetrics(QWidget):
             """
         )
 
-    def update_metrics_table(self, jump_idx, max_jump_idx, second_max_jump_idx):
+    def update_metrics_table(
+        self, jump_idx, max_jump_idx, second_max_jump_idx, feedback_metrics
+    ):
         """Update the metrics table to show the selected jump, its comparison, and percentage change."""
         self.curr_jump_idx = jump_idx
 
@@ -114,14 +117,17 @@ class GUIMetrics(QWidget):
                 # Metric name
                 metric_item = QTableWidgetItem(key)
                 metric_item.setTextAlignment(Qt.AlignCenter)
-                if key in self.key_metrics:  # Bold the key metrics
+                if (
+                    key in self.key_metrics or key in feedback_metrics
+                ):  # Bold key or feedback metrics
                     metric_item.setFont(self.get_bold_font())
                 self.metrics_table.setItem(row_idx, 0, metric_item)
 
                 # Selected jump value
                 selected_value = selected_jump.get(key, "N/A")
                 selected_item = self.create_table_item(
-                    selected_value, bold=(key in self.key_metrics)
+                    selected_value,
+                    bold=(key in self.key_metrics or key in feedback_metrics),
                 )
                 self.metrics_table.setItem(row_idx, 1, selected_item)
 
@@ -166,29 +172,38 @@ class GUIMetrics(QWidget):
         # Combine key metrics and other metrics
         all_metrics = key_metrics_data + other_metrics_data
 
-        # Populate the table
         for row_idx, key in enumerate(all_metrics):
             self.metrics_table.insertRow(row_idx)
+
+            # Determine if the row should have a yellow background
+            is_feedback_metric = key in feedback_metrics
+            is_key_metric = key in self.key_metrics
 
             # Metric name
             metric_item = QTableWidgetItem(key)
             metric_item.setTextAlignment(Qt.AlignCenter)
-            if key in self.key_metrics:  # Bold the key metrics
+            if is_key_metric:  # Bold key metrics
                 metric_item.setFont(self.get_bold_font())
+            if is_feedback_metric:  # Yellow background for feedback metrics
+                metric_item.setBackground(QColor("#ffffe0"))
             self.metrics_table.setItem(row_idx, 0, metric_item)
 
             # Selected jump value
             selected_value = selected_jump.get(key, "N/A")
             selected_item = self.create_table_item(
-                selected_value, bold=(key in self.key_metrics)
+                selected_value, bold=is_key_metric  # Bold if key metric
             )
+            if is_feedback_metric:  # Yellow background for feedback metrics
+                selected_item.setBackground(QColor("#ffffe0"))
             self.metrics_table.setItem(row_idx, 1, selected_item)
 
             # Comparison jump value
             comparison_value = comparison_jump.get(key, "N/A")
             comparison_item = self.create_table_item(
-                comparison_value, bold=(key in self.key_metrics)
+                comparison_value, bold=is_key_metric  # Bold if key metric
             )
+            if is_feedback_metric:  # Yellow background for feedback metrics
+                comparison_item.setBackground(QColor("#ffffe0"))
             self.metrics_table.setItem(row_idx, 2, comparison_item)
 
             # Percentage change
@@ -207,11 +222,10 @@ class GUIMetrics(QWidget):
 
             percentage_item = QTableWidgetItem(percentage_text)
             percentage_item.setTextAlignment(Qt.AlignCenter)
-
-            # Bold percentage change for key metrics
-            if key in self.key_metrics:
+            if is_key_metric:  # Bold if key metric
                 percentage_item.setFont(self.get_bold_font())
-
+            if is_feedback_metric:  # Yellow background for feedback metrics
+                percentage_item.setBackground(QColor("#ffffe0"))
             self.metrics_table.setItem(row_idx, 3, percentage_item)
 
         # Adjust header labels based on the comparison

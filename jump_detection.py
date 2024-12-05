@@ -35,7 +35,10 @@ class Jump:
 
         self.detected_time = detected_time
         self.partition = self.find_jump_events()
-        self.metrics = self.calculate_metrics()
+        if self.partition == None:
+            self.metrics = None
+        else:
+            self.metrics = self.calculate_metrics()
 
     def __repr__(self):
         details = (
@@ -48,27 +51,30 @@ class Jump:
 
     # CALCULATE PARTITIONS --------------------------------------------
     def find_jump_events(self):
-        # Extract timestamps and vertical (x-axis) velocity
-        timestamps = self.lower_back_vel[:, 0]
-        vertical_velocity = self.lower_back_vel[:, 1]  # x-axis
-        # print(vertical_velocity)
-        # Find indices for takeoff, peak, and landing
-        takeoff_idx = np.argmax(vertical_velocity)  # Maximum upward velocity
-        # print(takeoff_idx, vertical_velocity[takeoff_idx])
+        try:
+            # Extract timestamps and vertical (x-axis) velocity
+            timestamps = self.lower_back_vel[:, 0]
+            vertical_velocity = self.lower_back_vel[:, 1]  # x-axis
+            # print(vertical_velocity)
+            # Find indices for takeoff, peak, and landing
+            takeoff_idx = np.argmax(vertical_velocity)  # Maximum upward velocity
+            # print(takeoff_idx, vertical_velocity[takeoff_idx])
 
-        landing_idx = takeoff_idx + np.argmin(vertical_velocity[takeoff_idx:])
-        # print(landing_idx)
-        # print(vertical_velocity[takeoff_idx:landing_idx])
-        peak_idx = takeoff_idx + np.argmin(
-            np.abs(vertical_velocity[takeoff_idx:landing_idx])
-        )
+            landing_idx = takeoff_idx + np.argmin(vertical_velocity[takeoff_idx:])
+            # print(landing_idx)
+            # print(vertical_velocity[takeoff_idx:landing_idx])
+            peak_idx = takeoff_idx + np.argmin(
+                np.abs(vertical_velocity[takeoff_idx:landing_idx])
+            )
 
-        # Get corresponding times
-        takeoff_time = timestamps[takeoff_idx]
-        peak_time = timestamps[peak_idx]
-        landing_time = timestamps[landing_idx]
+            # Get corresponding times
+            takeoff_time = timestamps[takeoff_idx]
+            peak_time = timestamps[peak_idx]
+            landing_time = timestamps[landing_idx]
 
-        return (takeoff_time, peak_time, landing_time)
+            return (takeoff_time, peak_time, landing_time)
+        except:
+            return None
 
     # CALCULATE METRICS --------------------------------------------
     def calculate_metrics(self):
@@ -251,7 +257,7 @@ class JumpDetectionThread(QThread):
                 # Recreate each jump object in place to recalculate metrics
                 for i in range(len(self.jumps)):
                     old_jump = self.jumps[i]
-                    self.jumps[i] = Jump(
+                    jump = Jump(
                         lower_back_accel=old_jump.lower_back_accel,
                         lower_back_gyro=old_jump.lower_back_gyro,
                         wrist_accel=old_jump.wrist_accel,
@@ -283,7 +289,7 @@ class JumpDetectionThread(QThread):
                 ):
                     accel_data = self.data[address]["accel"]
                     # Check the last value in the x-direction (second column for 0-index)
-                    if accel_data[-1, 1] > 2.5 and (time() - self.last_jump_time > 2):
+                    if accel_data[-1, 1] > 2.0 and (time() - self.last_jump_time > 2):
                         print("Jump detected!")
                         self.process_detected_jump(address)
 
@@ -294,10 +300,10 @@ class JumpDetectionThread(QThread):
         self.last_jump_time = current_time
 
         # Wait for 1.5 seconds after the jump to ensure all post-jump data is available
-        sleep(1.5)
+        sleep(2)
 
         # Determine the time interval for data extraction
-        pre_jump_time = current_time - 1  # Half a second before the jump
+        pre_jump_time = current_time - 1.5  # Half a second before the jump
         post_jump_time = current_time + 1.5  # One and a half seconds after the jump
 
         # Prepare data from all devices for the Jump object
@@ -335,23 +341,28 @@ class JumpDetectionThread(QThread):
             detected_time=current_time,  # Use the approximate detected time of the jump
         )
 
-        if len(self.jumps) == 0:
-            self.first_jump_detected.emit()
-        self.jumps.append(jump)
-        print(f"Detected jump: {jump}")
+        if jump.metrics == None:
+            print("Faulty Jump Detected. Jump not saved.")
+        else:
+            if len(self.jumps) == 0:
+                self.first_jump_detected.emit()
+            self.jumps.append(jump)
+            print(f"Detected jump: {jump}")
 
-        sorted_indices = sorted(
-            range(len(self.jumps)),
-            key=lambda i: self.jumps[i].metrics.get("height", 0),
-            reverse=True,
-        )
-        highest_jump_idx = sorted_indices[0]
-        second_highest_jump_idx = sorted_indices[1] if len(sorted_indices) > 1 else None
+            sorted_indices = sorted(
+                range(len(self.jumps)),
+                key=lambda i: self.jumps[i].metrics.get("height", 0),
+                reverse=True,
+            )
+            highest_jump_idx = sorted_indices[0]
+            second_highest_jump_idx = (
+                sorted_indices[1] if len(sorted_indices) > 1 else None
+            )
 
-        # Emit the indices
-        self.jump_detected.emit(
-            len(self.jumps) - 1, highest_jump_idx, second_highest_jump_idx
-        )
+            # Emit the indices
+            self.jump_detected.emit(
+                len(self.jumps) - 1, highest_jump_idx, second_highest_jump_idx
+            )
 
     # FIND PARTITIONS----------------------------------------------
 
@@ -362,7 +373,7 @@ class JumpDetectionThread(QThread):
 def take_integral(data):
     timestamps = data[:, 0]
     values = data[:, 1:]
-    time_intervals = 2.0 / max(len(values), 1)
+    time_intervals = 3.0 / max(len(values), 1)
     values_centered = values - np.mean(values, axis=0)
     integrated_values = np.cumsum(values_centered, axis=0) * time_intervals
     return np.column_stack((timestamps, integrated_values))

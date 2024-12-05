@@ -1,5 +1,6 @@
 from PyQt5.QtWidgets import QWidget, QHBoxLayout, QPushButton, QLabel, QVBoxLayout
 from PyQt5.QtCore import Qt
+from PyQt5.QtWidgets import QMenu
 
 
 class GUISelector(QWidget):
@@ -45,6 +46,35 @@ class GUISelector(QWidget):
             self.add_jump_button(i)
             self.update_jump_view(i)
 
+    from PyQt5.QtWidgets import QMenu
+
+    # Add this method to GUISelector
+    def add_context_menu(self, button, idx):
+        """Add a context menu to a button to allow jump deletion."""
+
+        def show_context_menu(point):
+            menu = QMenu()
+            delete_action = menu.addAction("Delete Jump")
+            action = menu.exec_(button.mapToGlobal(point))
+            if action == delete_action:
+                self.delete_jump(idx)
+
+        button.setContextMenuPolicy(Qt.CustomContextMenu)
+        button.customContextMenuRequested.connect(show_context_menu)
+
+    def delete_jump(self, idx):
+        """Delete the jump at the given index and update the UI."""
+        # Remove the jump from the array
+        if 0 <= idx - 1 < len(self.jumps):
+            del self.jumps[idx - 1]
+        # Update the UI
+        self.update_ui(
+            recent_jump_idx=0,
+            highest_jump_idx=max(0, self.highest_jump_button - 1),
+            second_highest_jump_idx=max(0, self.second_highest_jump_button - 1),
+        )
+
+    # Update `add_jump_button` method to attach the context menu
     def add_jump_button(self, idx):
         """Add a button for each jump."""
         # Determine if this is the highest jump
@@ -69,6 +99,9 @@ class GUISelector(QWidget):
         # Highlight the new button as the selected one
         self.set_button_style(button, selected=True)
         self.selected_button = button  # Update the selected button reference
+
+        # Add the context menu for deletion
+        self.add_context_menu(button, idx)
 
         # Handle button click to update selection
         button.clicked.connect(
@@ -100,11 +133,14 @@ class GUISelector(QWidget):
         """Update the jump plot and metrics when a jump is selected."""
         jump_idx -= 1
         self.jump_widget.update_jump_plot(jump_idx)
-        self.metrics_widget.update_metrics_table(
+        feedback_metrics = self.feedback_widget.update_feedback(
             jump_idx, self.highest_jump_button, self.second_highest_jump_button
         )
-        self.feedback_widget.update_feedback(
-            jump_idx, self.highest_jump_button, self.second_highest_jump_button
+        self.metrics_widget.update_metrics_table(
+            jump_idx,
+            self.highest_jump_button,
+            self.second_highest_jump_button,
+            feedback_metrics,
         )
 
     def set_button_style(self, button, selected):
