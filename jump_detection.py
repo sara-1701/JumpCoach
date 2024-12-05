@@ -85,10 +85,10 @@ class Jump:
             "distance_traveled_x": calculate_distance_traveled(
                 self.lower_back_disp, axis="x"
             ),
-            "side_movement": calculate_distance_traveled(
+            "forward_backward_movement": calculate_distance_traveled(
                 self.lower_back_disp, axis="y"
             ),
-            "forward_backward_movement": calculate_distance_traveled(
+            "lateral_movement": calculate_distance_traveled(
                 self.lower_back_disp, axis="z"
             ),
             "takeoff_max_vertical_arm_speed": calculate_max_speed(
@@ -214,6 +214,12 @@ class Jump:
             "landing_impact_jerk": calculate_landing_impact(
                 self.wrist_disp, landing_time
             )[1],
+            "takeoff_knee_bend": calculate_max_knee_bend(
+                self.thigh_accel, 0, takeoff_time
+            ),
+            "landing_knee_bend": calculate_max_knee_bend(
+                self.thigh_accel, landing_time, self.thigh_accel[-1][0], True
+            ),
         }
 
         return metrics
@@ -277,7 +283,7 @@ class JumpDetectionThread(QThread):
                 ):
                     accel_data = self.data[address]["accel"]
                     # Check the last value in the x-direction (second column for 0-index)
-                    if accel_data[-1, 1] > 2 and (time() - self.last_jump_time > 2):
+                    if accel_data[-1, 1] > 2.5 and (time() - self.last_jump_time > 2):
                         print("Jump detected!")
                         self.process_detected_jump(address)
 
@@ -515,7 +521,82 @@ def calculate_landing_impact(thigh_accel, starttime):
     # Calculate jerk (rate of change of acceleration)
     time_intervals = np.diff(landing_timestamps)  # Time intervals between samples
     accel_diff = np.diff(accel_magnitude)  # Differences in acceleration
+
+    mask = (
+        time_intervals != 0
+    )  # Create a mask for elements where time_intervals is not 0
+    time_intervals = time_intervals[mask]  # Filter the array based on the mask
+    accel_diff = accel_diff[mask]  # Apply the same mask to accel_diff
+
     jerk = accel_diff / time_intervals  # Jerk (rate of change of acceleration)
     mean_jerk = np.mean(np.abs(jerk))  # Average absolute jerk
 
     return [peak_acceleration, mean_jerk]
+
+
+from scipy.signal import butter, filtfilt
+
+
+def low_pass_filter(data, cutoff=2.0, fs=100, order=2):
+    """
+    Apply a low-pass Butterworth filter to the data.
+
+    Parameters:
+    - data: 1D NumPy array of raw signal.
+    - cutoff: Cutoff frequency in Hz.
+    - fs: Sampling frequency in Hz.
+    - order: Order of the Butterworth filter.
+
+    Returns:
+    - Filtered signal as a NumPy array.
+    """
+
+    if len(data) < 9:  # Check if data length is shorter than required padlen
+        return data  # Return the original data unfiltered if too short
+
+    nyquist = 0.5 * fs
+    normal_cutoff = cutoff / nyquist
+    b, a = butter(order, normal_cutoff, btype="low", analog=False)
+    return filtfilt(b, a, data)
+
+
+def calculate_max_knee_bend(data, starttime, endtime, flag=False):
+    """
+    Calculate the maximal bend of the knee based on thigh IMU data.
+
+    Parameters:
+    - thigh_imu_data: A NumPy array containing IMU data with columns [timestamp, ax, ay, az].
+    - starttime: The start time of the data window for analysis.
+    - endtime: The end time of the data window for analysis.
+
+    Returns:
+    - max_knee_bend: The maximal knee bend angle (in degrees) during the specified time window.
+    """
+    # Extract timestamps and accelerometer components
+    timestamps = data[:, 0]
+    accel_data = data[:, 1:]  # x, y, z columns
+
+    # Find the indices corresponding to the specified time window
+    start_idx = np.abs(timestamps - starttime).argmin()
+    end_idx = np.abs(timestamps - endtime).argmin()
+
+    # Extract the relevant data for the time window
+    window_accel = accel_data[start_idx : end_idx + 1]
+
+    if window_accel.shape[0] < 2:  # Not enough data points to calculate metrics
+        return 0
+
+    ax, ay = window_accel[:, 0], window_accel[:, 1]
+
+    # Calculate the tilt angle of the thigh (pitch) using the accelerometer
+    # Assume 'ax' is up and down (vertical), 'ay' is forward-backward, 'az' is inward-outward
+    if flag:
+        ax, ay = low_pass_filter(ax), low_pass_filter(ay)
+
+    pitch_angles = np.arctan2(-ay, ax)  # Pitch in radians (rotation in sagittal plane)
+    pitch_angles_degrees = np.degrees(pitch_angles)  # Convert to degrees
+
+    # Calculate the maximal knee bend (maximal pitch angle)
+    max_knee_bend = np.max(pitch_angles_degrees)
+
+    return max_knee_bend

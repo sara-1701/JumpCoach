@@ -27,8 +27,8 @@ device_info = {
 data = {}  # {Device address: (accel_deque, gyro_deque)}
 threads = []  # To manage IMU data threads
 jumps = []
-import_jumps = True
-export_jumps = False
+import_jumps = False
+export_jumps = True
 
 if import_jumps == True:
     jumps = load_jump_objects()

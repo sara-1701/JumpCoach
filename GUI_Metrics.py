@@ -17,7 +17,11 @@ class GUIMetrics(QWidget):
         self.key_metrics = [
             "height",
             "airtime",
-            "takeoff_avg_vertical_arm_speed",
+            "takeoff_knee_bend",
+            "landing_impact_jerk",
+            "landing_knee_bend",
+            "forward_backward_movement",
+            "lateral_movement",
         ]  # Hardcoded key metrics
         self.initialize_metrics_table()
 
@@ -85,7 +89,56 @@ class GUIMetrics(QWidget):
         """Update the metrics table to show the selected jump, its comparison, and percentage change."""
         self.curr_jump_idx = jump_idx
 
-        # Determine the comparison jump based on whether the current jump is the PB
+        # Check if there's only one jump
+        if len(self.jumps) == 1:
+            selected_jump = self.jumps[jump_idx].metrics
+
+            # Clear the table rows and set new column count
+            self.metrics_table.setRowCount(0)
+
+            # Separate key metrics (at the top) and other metrics
+            key_metrics_data = [key for key in self.key_metrics if key in selected_jump]
+            other_metrics_data = [
+                key
+                for key in sorted(selected_jump.keys())
+                if key not in self.key_metrics
+            ]
+
+            # Combine key metrics and other metrics
+            all_metrics = key_metrics_data + other_metrics_data
+
+            # Populate the table
+            for row_idx, key in enumerate(all_metrics):
+                self.metrics_table.insertRow(row_idx)
+
+                # Metric name
+                metric_item = QTableWidgetItem(key)
+                metric_item.setTextAlignment(Qt.AlignCenter)
+                if key in self.key_metrics:  # Bold the key metrics
+                    metric_item.setFont(self.get_bold_font())
+                self.metrics_table.setItem(row_idx, 0, metric_item)
+
+                # Selected jump value
+                selected_value = selected_jump.get(key, "N/A")
+                selected_item = self.create_table_item(
+                    selected_value, bold=(key in self.key_metrics)
+                )
+                self.metrics_table.setItem(row_idx, 1, selected_item)
+
+                # Mark comparison and percentage change as "N/A"
+                for col_idx in range(2, 4):
+                    na_item = QTableWidgetItem("N/A")
+                    na_item.setTextAlignment(Qt.AlignCenter)
+                    self.metrics_table.setItem(row_idx, col_idx, na_item)
+
+            # Adjust header labels for single jump case
+            current_jump_label = f"Jump #{jump_idx + 1}"
+            self.metrics_table.setHorizontalHeaderLabels(
+                ["Metric", current_jump_label, "N/A", "N/A"]
+            )
+            return
+
+        # Regular case: More than one jump
         if jump_idx == max_jump_idx:
             comparison_jump_idx = (
                 second_max_jump_idx  # Compare PB to the second-highest jump
@@ -100,7 +153,7 @@ class GUIMetrics(QWidget):
         comparison_jump = self.jumps[comparison_jump_idx].metrics
 
         # Clear the table rows and set new column count
-        self.metrics_table.setRowCount(0)  # Clear existing rows only
+        self.metrics_table.setRowCount(0)
 
         # Separate key metrics (at the top) and other metrics
         key_metrics_data = [key for key in self.key_metrics if key in selected_jump]
@@ -154,6 +207,11 @@ class GUIMetrics(QWidget):
 
             percentage_item = QTableWidgetItem(percentage_text)
             percentage_item.setTextAlignment(Qt.AlignCenter)
+
+            # Bold percentage change for key metrics
+            if key in self.key_metrics:
+                percentage_item.setFont(self.get_bold_font())
+
             self.metrics_table.setItem(row_idx, 3, percentage_item)
 
         # Adjust header labels based on the comparison
