@@ -241,7 +241,7 @@ class JumpDetectionThread(QThread):
         while self.running:
             if self.import_jumps_flag:
                 self.import_jumps_flag = False
-                print(f"\nRecacluclate jumps")
+                print(f"\nRecalculate jumps")
                 # Recreate each jump object in place to recalculate metrics
                 for i in range(len(self.jumps)):
                     old_jump = self.jumps[i]

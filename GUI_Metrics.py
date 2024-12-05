@@ -5,8 +5,6 @@ from PyQt5.QtWidgets import (
     QTableWidget,
     QTableWidgetItem,
     QHeaderView,
-    QScrollArea,
-    QHBoxLayout,
 )
 from PyQt5.QtCore import Qt
 
@@ -37,17 +35,36 @@ class GUIMetrics(QWidget):
         self.metrics_table = QTableWidget()
         self.layout.addWidget(self.metrics_table)
 
-        self.metrics_table.setColumnCount(3)  # Number of columns
-        self.metrics_table.setRowCount(1)  # Temporary row count for testing
+        self.metrics_table.setColumnCount(4)  # Number of columns
+        self.metrics_table.setRowCount(0)  # No rows initially
         self.metrics_table.setHorizontalHeaderLabels(
-            ["Metric", "Selected Jump", "PB/Prev. PB"]
+            ["Metric", "Selected Jump", "PB/Prev. PB", "% Change"]
         )
         self.metrics_table.horizontalHeader().setVisible(True)
-        self.metrics_table.horizontalHeader().setSectionResizeMode(QHeaderView.Stretch)
         self.metrics_table.verticalHeader().setVisible(False)
 
-        # Ensuring the headers are visible and the table is stretched
-        self.metrics_table.horizontalHeader().setStretchLastSection(True)
+        # Prevent selection or editing
+        self.metrics_table.setEditTriggers(QTableWidget.NoEditTriggers)
+        self.metrics_table.setSelectionMode(QTableWidget.NoSelection)
+        self.metrics_table.setFocusPolicy(Qt.NoFocus)
+
+        # Set custom column widths
+        self.metrics_table.horizontalHeader().setSectionResizeMode(
+            0, QHeaderView.Interactive
+        )  # Custom width for the first column
+        self.metrics_table.horizontalHeader().setSectionResizeMode(
+            1, QHeaderView.Stretch
+        )  # Dynamic for second column
+        self.metrics_table.horizontalHeader().setSectionResizeMode(
+            2, QHeaderView.Stretch
+        )  # Dynamic for third column
+        self.metrics_table.horizontalHeader().setSectionResizeMode(
+            3, QHeaderView.Stretch
+        )  # Dynamic for fourth column
+
+        # Set the first column width to be twice the size of the other columns
+        self.metrics_table.setColumnWidth(0, 250)
+
         # Style sheet for the table and header
         self.metrics_table.setStyleSheet(
             f"""
@@ -58,14 +75,14 @@ class GUIMetrics(QWidget):
             }}
             QHeaderView::section {{
                 background-color: {self.color_palette['accent_color']};  /* Yellow background for header */
-                color: {self.color_palette['black']};  /* White text for header */
+                color: {self.color_palette['black']};  /* Black text for header */
                 font-size: 24px;  /* Font size for header */
             }}
             """
         )
 
     def update_metrics_table(self, jump_idx, max_jump_idx, second_max_jump_idx):
-        """Update the metrics table to show the selected jump and its relevant comparison."""
+        """Update the metrics table to show the selected jump, its comparison, and percentage change."""
         self.curr_jump_idx = jump_idx
 
         # Determine the comparison jump based on whether the current jump is the PB
@@ -82,7 +99,7 @@ class GUIMetrics(QWidget):
         selected_jump = self.jumps[jump_idx].metrics
         comparison_jump = self.jumps[comparison_jump_idx].metrics
 
-        # Clear the table rows
+        # Clear the table rows and set new column count
         self.metrics_table.setRowCount(0)  # Clear existing rows only
 
         # Separate key metrics (at the top) and other metrics
@@ -121,14 +138,29 @@ class GUIMetrics(QWidget):
             )
             self.metrics_table.setItem(row_idx, 2, comparison_item)
 
+            # Percentage change
+            if isinstance(selected_value, (int, float)) and isinstance(
+                comparison_value, (int, float)
+            ):
+                if comparison_value != 0:
+                    percentage_change = (
+                        (selected_value - comparison_value) / comparison_value
+                    ) * 100
+                    percentage_text = f"{percentage_change:+.2f}%"  # Show +/- sign
+                else:
+                    percentage_text = "∞"  # Infinite change if comparison value is 0
+            else:
+                percentage_text = "N/A"
+
+            percentage_item = QTableWidgetItem(percentage_text)
+            percentage_item.setTextAlignment(Qt.AlignCenter)
+            self.metrics_table.setItem(row_idx, 3, percentage_item)
+
         # Adjust header labels based on the comparison
         current_jump_label = f"Jump #{jump_idx + 1}"
         self.metrics_table.setHorizontalHeaderLabels(
-            ["Metric", current_jump_label, comparison_label]
+            ["Metric", current_jump_label, comparison_label, "% Change"]
         )
-
-        # Adjust column widths
-        self.metrics_table.horizontalHeader().setSectionResizeMode(QHeaderView.Stretch)
 
     def create_table_item(self, value, bold=False):
         """Create a table item with optional bold font."""

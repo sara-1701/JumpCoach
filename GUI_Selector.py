@@ -98,7 +98,6 @@ class GUISelector(QWidget):
 
     def update_jump_view(self, jump_idx):
         """Update the jump plot and metrics when a jump is selected."""
-        print(f"Updating jump view for jump #{jump_idx}")
         jump_idx -= 1
         self.jump_widget.update_jump_plot(jump_idx)
         self.metrics_widget.update_metrics_table(
