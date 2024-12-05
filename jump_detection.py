@@ -208,13 +208,21 @@ class Jump:
             "_frontal_arm_movement": calculate_movement(
                 self.wrist_disp, "z", 0, self.wrist_disp[-1][0]
             ),
+            "landing_impact_max_acceleration": calculate_landing_impact(
+                self.wrist_disp, landing_time
+            )[0],
+            "landing_impact_jerk": calculate_landing_impact(
+                self.wrist_disp, landing_time
+            )[1],
         }
 
         return metrics
 
 
 class JumpDetectionThread(QThread):
-    jump_detected = pyqtSignal(int, int)  # Signal to emit Jump object index for GUI
+    jump_detected = pyqtSignal(
+        int, int, int
+    )  # Signal to emit Jump object index for GUI
     first_jump_detected = pyqtSignal()
 
     def __init__(self, device_info, data, jumps, import_jumps_flag):
@@ -247,11 +255,20 @@ class JumpDetectionThread(QThread):
                         detected_time=old_jump.detected_time,
                     )
                 self.first_jump_detected.emit()
-                highest_jump_idx = max(
+                sorted_indices = sorted(
                     range(len(self.jumps)),
                     key=lambda i: self.jumps[i].metrics.get("height", 0),
+                    reverse=True,
                 )
-                self.jump_detected.emit(len(self.jumps) - 1, highest_jump_idx)
+                highest_jump_idx = sorted_indices[0]
+                second_highest_jump_idx = (
+                    sorted_indices[1] if len(sorted_indices) > 1 else None
+                )
+
+                # Emit the indices
+                self.jump_detected.emit(
+                    len(self.jumps) - 1, highest_jump_idx, second_highest_jump_idx
+                )
             # Iterate over device information to find 'Lower Back' device
             for address, device_name in self.device_info.items():
                 if (
@@ -317,10 +334,18 @@ class JumpDetectionThread(QThread):
         self.jumps.append(jump)
         print(f"Detected jump: {jump}")
 
-        highest_jump_idx = max(
-            range(len(self.jumps)), key=lambda i: self.jumps[i].metrics.get("height", 0)
+        sorted_indices = sorted(
+            range(len(self.jumps)),
+            key=lambda i: self.jumps[i].metrics.get("height", 0),
+            reverse=True,
         )
-        self.jump_detected.emit(len(self.jumps) - 1, highest_jump_idx)
+        highest_jump_idx = sorted_indices[0]
+        second_highest_jump_idx = sorted_indices[1] if len(sorted_indices) > 1 else None
+
+        # Emit the indices
+        self.jump_detected.emit(
+            len(self.jumps) - 1, highest_jump_idx, second_highest_jump_idx
+        )
 
     # FIND PARTITIONS----------------------------------------------
 
@@ -452,3 +477,45 @@ def calculate_movement(displacement, axis, starttime, endtime):
         return 0
     total_distance = np.sum(np.abs(np.diff(phase_displacement)))
     return total_distance
+
+
+import numpy as np
+
+
+def calculate_landing_impact(thigh_accel, starttime):
+    """
+    Calculate a landing impact metric using the thigh IMU acceleration data.
+
+    Returns:
+    - A dictionary containing:
+        - 'peak_acceleration': The maximum magnitude of acceleration during landing.
+        - 'mean_jerk': The average rate of change of acceleration (jerk) during landing.
+    """
+    # Extract timestamps and acceleration components
+    timestamps = thigh_accel[:, 0]
+    accel_data = thigh_accel[:, 1:]  # x, y, z columns
+
+    # Find the indices corresponding to the landing phase
+    start_idx = np.abs(timestamps - starttime).argmin() - 2
+    end_idx = start_idx + 20
+
+    # Extract the landing phase acceleration data
+    landing_accel = accel_data[start_idx : end_idx + 1, :]
+    landing_timestamps = timestamps[start_idx : end_idx + 1]
+
+    if landing_accel.shape[0] < 2:  # Not enough data points to calculate metrics
+        return [0, 0]
+
+    # Calculate the magnitude of acceleration (Euclidean norm)
+    accel_magnitude = np.linalg.norm(landing_accel, axis=1)
+
+    # Calculate peak acceleration during landing
+    peak_acceleration = np.max(accel_magnitude)
+
+    # Calculate jerk (rate of change of acceleration)
+    time_intervals = np.diff(landing_timestamps)  # Time intervals between samples
+    accel_diff = np.diff(accel_magnitude)  # Differences in acceleration
+    jerk = accel_diff / time_intervals  # Jerk (rate of change of acceleration)
+    mean_jerk = np.mean(np.abs(jerk))  # Average absolute jerk
+
+    return [peak_acceleration, mean_jerk]

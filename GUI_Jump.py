@@ -51,7 +51,7 @@ class GUIJump(QWidget):
         self.setStyleSheet(
             f"""
             QWidget {{
-                background-color: {self.color_palette['block_bg']};
+                background-color: {self.color_palette['white']};
                 font-size: 18px;
                 font-family: 'Roboto', sans-serif;
                 border-radius: 10px;
@@ -63,23 +63,6 @@ class GUIJump(QWidget):
                 border: 1px solid {self.color_palette['dark_grey']};
                 border-radius: 5px;
                 min-height: 30px;
-            }}
-            QComboBox::drop-down {{
-                subcontrol-origin: padding;
-                subcontrol-position: top right;
-                width: 30px;
-                border-left-width: 1px;
-                border-left-color: {self.color_palette['dark_grey']};
-                border-left-style: solid; /* just a single line on the right */
-                border-top-right-radius: 3px; /* same radius as the QComboBox */
-                border-bottom-right-radius: 3px;
-            }}
-            QComboBox::down-arrow {{
-                width: 10px;
-                height: 10px;
-                color: {self.color_palette['black']};
-                text-align: center;
-                content: "▼"; 
             }}
             """
         )

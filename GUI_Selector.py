@@ -1,54 +1,49 @@
-from PyQt5.QtWidgets import QWidget, QHBoxLayout, QPushButton, QLabel
+from PyQt5.QtWidgets import QWidget, QHBoxLayout, QPushButton, QLabel, QVBoxLayout
 from PyQt5.QtCore import Qt
 
 
 class GUISelector(QWidget):
     """A widget to handle the selection and display of jumps."""
 
-    def __init__(self, color_palette, jumps, jump_widget, metrics_widget):
+    def __init__(
+        self, color_palette, jumps, jump_widget, metrics_widget, feedback_widget
+    ):
         super().__init__()
         self.color_palette = color_palette
         self.jump_widget = jump_widget
         self.metrics_widget = metrics_widget
+        self.feedback_widget = feedback_widget
         self.jumps = jumps  # Reference to the external jumps list
 
-        self.layout = QHBoxLayout(self)
-        self.layout.setAlignment(Qt.AlignCenter)
+        # Main layout
+        self.layout = QVBoxLayout(self)
+        self.layout.setAlignment(Qt.AlignTop)
         self.layout.setContentsMargins(5, 5, 5, 5)
-        self.setLayout(self.layout)
-        self.selector_label = None  # Initialize the placeholder label variable
+
+        # Add title
+        self.title_label = QLabel("Jump Selector")
+        self.title_label.setAlignment(Qt.AlignCenter)
+        self.title_label.setStyleSheet("font-size: 28px; font-family: 'Roboto';")
+        self.layout.addWidget(self.title_label)
+
+        # Horizontal layout for jump buttons
+        self.buttons_layout = QHBoxLayout()
+        self.buttons_layout.setAlignment(Qt.AlignCenter)
+        self.layout.addLayout(self.buttons_layout)
+
         self.selected_button = None  # Keep track of the currently selected button
         self.highest_jump_button = None
-        self.update_ui(recent_jump_idx=0, highest_jump_idx=0)
+        self.second_highest_jump_button = None
+        self.update_ui(recent_jump_idx=0, highest_jump_idx=0, second_highest_jump_idx=0)
 
-    def update_ui(self, recent_jump_idx, highest_jump_idx):
-        # This method is called when the signal is emitted
-        print(
-            f"Recent Jump Index: {recent_jump_idx}, Highest Jump Index: {highest_jump_idx}"
-        )
-        self.highest_jump_button = highest_jump_idx
+    def update_ui(self, recent_jump_idx, highest_jump_idx, second_highest_jump_idx):
         """Update UI to reflect current jumps, adding or removing buttons as needed."""
-        # Clear existing widgets first
+        self.highest_jump_button = highest_jump_idx
+        self.second_highest_jump_button = second_highest_jump_idx
         self.clear_ui()
-        # Add buttons for each jump or show the placeholder if the list is empty
-        if not self.jumps:
-            self.add_placeholder_label()
-        else:
-            for i in range(1, len(self.jumps) + 1):
-                self.add_jump_button(i)
-                self.update_jump_view(i)
-
-    def add_placeholder_label(self):
-        """Add or show the placeholder label."""
-        if not self.selector_label:
-            self.selector_label = QLabel("Jump to see your performance!")
-            self.selector_label.setAlignment(Qt.AlignCenter)
-            self.selector_label.setStyleSheet(
-                f"font-size: 16px; color: {self.color_palette['dark_grey']};"
-            )
-            self.layout.addWidget(self.selector_label)
-        else:
-            self.selector_label.show()  # Ensure the label is visible if reused
+        for i in range(1, len(self.jumps) + 1):
+            self.add_jump_button(i)
+            self.update_jump_view(i)
 
     def add_jump_button(self, idx):
         """Add a button for each jump."""
@@ -63,11 +58,11 @@ class GUISelector(QWidget):
         button = QPushButton(label_text)
 
         # Add the new button to the layout
-        self.layout.addWidget(button)
+        self.buttons_layout.addWidget(button)
 
         # Set all buttons to not selected initially
-        for i in range(self.layout.count()):
-            existing_button = self.layout.itemAt(i).widget()
+        for i in range(self.buttons_layout.count()):
+            existing_button = self.buttons_layout.itemAt(i).widget()
             if existing_button:
                 self.set_button_style(existing_button, selected=False)
 
@@ -83,8 +78,8 @@ class GUISelector(QWidget):
     def on_button_click(self, idx, button):
         """Handle button click and update styles."""
         # Deselect all buttons
-        for i in range(self.layout.count()):
-            existing_button = self.layout.itemAt(i).widget()
+        for i in range(self.buttons_layout.count()):
+            existing_button = self.buttons_layout.itemAt(i).widget()
             if existing_button:
                 self.set_button_style(existing_button, selected=False)
 
@@ -94,21 +89,24 @@ class GUISelector(QWidget):
         self.update_jump_view(idx)
 
     def clear_ui(self):
-        """Clears the layout of all widgets except the placeholder, if present."""
-        while self.layout.count():
-            child = self.layout.takeAt(0).widget()
+        """Clears the layout of all widgets."""
+        while self.buttons_layout.count():
+            child = self.buttons_layout.takeAt(0).widget()
             if child:
                 child.hide()
                 child.deleteLater()
-        # Reset the placeholder label for potential reuse
-        self.selector_label = None
 
     def update_jump_view(self, jump_idx):
+        """Update the jump plot and metrics when a jump is selected."""
         print(f"Updating jump view for jump #{jump_idx}")
         jump_idx -= 1
-        """Update the jump plot and metrics when a jump is selected."""
         self.jump_widget.update_jump_plot(jump_idx)
-        self.metrics_widget.update_metrics_table(jump_idx, self.highest_jump_button)
+        self.metrics_widget.update_metrics_table(
+            jump_idx, self.highest_jump_button, self.second_highest_jump_button
+        )
+        self.feedback_widget.update_feedback(
+            jump_idx, self.highest_jump_button, self.second_highest_jump_button
+        )
 
     def set_button_style(self, button, selected):
         """Set button style based on selection state."""
@@ -125,7 +123,7 @@ class GUISelector(QWidget):
             button.setStyleSheet(
                 base_style.format(
                     border_color=self.color_palette["dark_grey"],
-                    background_color=self.color_palette["yellow"],
+                    background_color=self.color_palette["accent_color"],
                     text_color=self.color_palette["black"],
                 )
             )

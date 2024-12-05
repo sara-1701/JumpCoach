@@ -123,7 +123,7 @@ class GUILivePlots(QWidget):
                         title_suffix = (
                             f" ({frequency:.0f} Hz)"  # Frequency to be displayed
                         )
-                        sensor_name = "Accel" if sensor_type == "accel" else "Gyro"
+                        sensor_name = "Accel." if sensor_type == "accel" else "Gyro."
                         for i in range(1, 4):  # X, Y, Z data columns
                             plots[sensor_type].plot(
                                 time_data,

@@ -22,11 +22,11 @@ COLORS = {
     "red": "#EA4335",  # Google's red
     "yellow": "#FBBC05",  # Google's yellow
     "green": "#34A853",  # Google's green
-    "white": "#FFFFFF",  # White for backgrounds
+    "white": "#fdfdfd",  # White for backgrounds
     "grey": "#F4F4F4",  # Light grey for backgrounds
     "dark_grey": "#5F6368",  # Dark grey for text
     "black": "#000000",  # Black for text
-    "plot_bg": "#FFFFFF",  # Background for plots
+    "plot_bg": "#fdfdfd",  # Background for plots
     "plot_fg": "#000000",  # Foreground for plots
     "plot_lines_x": "#4285F4",  # X-axis line color
     "plot_lines_y": "#EA4335",  # Y-axis line color
@@ -35,7 +35,8 @@ COLORS = {
     "line_peak": "#FBBC05",
     "line_landing": "#FBBC05",
     "app_bg": "#e0e0e0",  # Light grey for app background
-    "block_bg": "#f4f4f4",  # Light grey for plot blocks
+    "block_bg": "#f2f3f4",  # Light grey for plot blocks
+    "accent_color": "#FFD500",
 }
 
 
@@ -93,18 +94,15 @@ class JumpAnalyzer(QWidget):
         # Scrollable selector
         scroll_area = QScrollArea()
         scroll_area.setWidgetResizable(True)
-        scroll_area.setFixedSize((panel_width - 60), 120)
+        scroll_area.setFixedSize((panel_width - 60), 170)
         self.selector_widget = GUISelector(
-            self.color_palette,
-            self.jumps,
-            jump_widget,
-            metrics_widget,
+            self.color_palette, self.jumps, jump_widget, metrics_widget, feedback_widget
         )
         scroll_area.setWidget(self.selector_widget)
         right_panel.addWidget(scroll_area, stretch=1)
 
         # Metrics and feedback
-        right_panel.addWidget(metrics_widget, stretch=1)
+        right_panel.addWidget(metrics_widget, stretch=2)
         right_panel.addWidget(feedback_widget, stretch=1)
 
         # Combine layouts
@@ -171,7 +169,7 @@ class MainApp(QWidget):
         self.jump_widget.setFixedWidth(panel_width)
 
         # Create the Feedback widget using GUIFeedbackBox
-        self.feedback_widget = GUIFeedbackBox(self.color_palette)
+        self.feedback_widget = GUIFeedbackBox(self.color_palette, self.jumps)
         self.feedback_widget.setFixedWidth(panel_width - 50)
 
         # Create the JumpAnalyzer component
