@@ -38,7 +38,10 @@ class Jump:
         if self.partition == None:
             self.metrics = None
         else:
-            self.metrics = self.calculate_metrics()
+            try:
+                self.metrics = self.calculate_metrics()
+            except:
+                self.metrics = None
 
     def __repr__(self):
         details = (
@@ -84,18 +87,26 @@ class Jump:
         takeoff_time, peak_time, landing_time = self.partition
 
         metrics = {
+            "HELLO": 5,
             "airtime": calculate_airtime(self.partition),
-            "height": calculate_height_from_displacement(
+            "height_displacement": calculate_height_from_displacement(
                 self.lower_back_disp, self.partition
             ),
+            "height": calculate_height_from_airtime(calculate_airtime(self.partition)),
             "distance_traveled_x": calculate_distance_traveled(
-                self.lower_back_disp, axis="x"
+                self.lower_back_disp, takeoff_time, landing_time, axis="x"
             ),
             "forward_backward_movement": calculate_distance_traveled(
-                self.lower_back_disp, axis="y"
+                self.lower_back_disp, takeoff_time, landing_time, "y"
             ),
             "lateral_movement": calculate_distance_traveled(
-                self.lower_back_disp, axis="z"
+                self.lower_back_disp, takeoff_time, landing_time, axis="z"
+            ),
+            "forward_backward_movement2": calculate_total_movement(
+                self.lower_back_disp, takeoff_time, landing_time, "y"
+            ),
+            "lateral_movement2": calculate_total_movement(
+                self.lower_back_disp, takeoff_time, landing_time, axis="z"
             ),
             "takeoff_max_vertical_arm_speed": calculate_max_speed(
                 self.wrist_vel, "x", 0, takeoff_time
@@ -266,6 +277,7 @@ class JumpDetectionThread(QThread):
                         thigh_gyro=old_jump.thigh_gyro,
                         detected_time=old_jump.detected_time,
                     )
+                    self.jumps[i] = jump
                 self.first_jump_detected.emit()
                 sorted_indices = sorted(
                     range(len(self.jumps)),
@@ -379,6 +391,10 @@ def take_integral(data):
     return np.column_stack((timestamps, integrated_values))
 
 
+def calculate_height_from_airtime(airtime):
+    return (9.81 * airtime**2) / 8
+
+
 def calculate_height_from_displacement(lower_back_disp, partition):
     takeoff_time, _, landing_time = partition
 
@@ -431,17 +447,41 @@ def calculate_airtime(partition):
     return landing_time - takeoff_time
 
 
-def calculate_distance_traveled(lower_back_disp, axis):
+def calculate_total_movement(velocity, starttime, endtime, axis):
+    axis_map = {"x": 1, "y": 2, "z": 3}
+    axis_idx = axis_map.get(axis)
+    timestamps = velocity[:, 0]
+    values = np.abs(
+        velocity[:, axis_idx]
+    )  # Take absolute velocity to account for direction
+
+    # Find indices for the time range
+    start_idx = np.abs(timestamps - starttime).argmin()
+    end_idx = np.abs(timestamps - endtime).argmin()
+
+    # Integrate using trapezoidal rule
+    relevant_timestamps = timestamps[start_idx : end_idx + 1]
+    relevant_values = values[start_idx : end_idx + 1]
+    return np.trapz(relevant_values, relevant_timestamps)
+
+
+def calculate_distance_traveled(lower_back_disp, starttime, endtime, axis):
     """
     Calculate the distance traveled along a specific axis using displacement data.
     """
     axis_map = {"x": 1, "y": 2, "z": 3}
     axis_idx = axis_map.get(axis)
-
+    timestamps = lower_back_disp[:, 0]
     displacement = lower_back_disp[:, axis_idx]
+
+    start_idx = np.abs(timestamps - starttime).argmin()
+    end_idx = np.abs(timestamps - endtime).argmin()
+
+    phase_displacement = displacement[start_idx : end_idx + 1]
+
     if axis_idx == 1:
-        return max(displacement)
-    return max(displacement) - min(displacement)
+        return max(phase_displacement)
+    return max(phase_displacement) - min(phase_displacement)
 
 
 def calculate_max_speed(velocity, axis, starttime, endtime):

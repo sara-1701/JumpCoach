@@ -79,7 +79,7 @@ class GUIFeedbackBox(QWidget):
                 "significantly_increase": "Bend your knees a lot more during takeoff.",
                 "slightly_decrease": "Bend your knees slightly less during takeoff.",
                 "decrease": "Bend your knees less during takeoff.",
-                "significantly_decrease": "Stop overbending your knees.",
+                "significantly_decrease": "Don't overbend your knees during takeoff.",
             },
             "takeoff_avg_vertical_arm_speed": {
                 "slightly_increase": "Swing your arms slightly more during takeoff.",
@@ -235,7 +235,7 @@ class GUIFeedbackBox(QWidget):
         changes = sorted(changes, key=lambda x: abs(x[1]), reverse=True)
         top_changes = []
         for metric, change in changes:
-            if len(top_changes) >= 3:
+            if len(top_changes) >= 1:
                 break
             feedback_line = ""
 

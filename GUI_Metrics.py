@@ -21,8 +21,6 @@ class GUIMetrics(QWidget):
             "takeoff_knee_bend",
             "landing_impact_jerk",
             "landing_knee_bend",
-            "forward_backward_movement",
-            "lateral_movement",
         ]  # Hardcoded key metrics
         self.initialize_metrics_table()
 
