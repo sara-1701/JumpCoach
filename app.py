@@ -6,7 +6,7 @@ from time import sleep
 import pickle
 
 
-def load_jump_objects(filename="jumps.pkl"):
+def load_jump_objects(filename="Subject1.pkl"):
     with open(filename, "rb") as file:
         jumps = pickle.load(file)
     return jumps
@@ -28,7 +28,7 @@ data = {}  # {Device address: (accel_deque, gyro_deque)}
 threads = []  # To manage IMU data threads
 jumps = []
 import_jumps = False
-export_jumps = True
+export_jumps = False
 
 if import_jumps == True:
     jumps = load_jump_objects()

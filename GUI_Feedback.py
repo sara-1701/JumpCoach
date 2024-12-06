@@ -1,6 +1,7 @@
 from PyQt5.QtWidgets import QWidget, QVBoxLayout, QLabel
 from PyQt5.QtCore import Qt
 import numpy as np
+import random
 
 
 class GUIFeedbackBox(QWidget):
@@ -133,6 +134,16 @@ class GUIFeedbackBox(QWidget):
                 "significantly_decrease": "You're hopping sideways like a crab. Stay more balanced.",
             },
         }
+
+        # Positive PB feedback messages
+        pb_feedback_messages = [
+            "Keep doing what you're doing!",
+            "Fantastic performance! Stay explosive!",
+            "You're crushing it! Keep up the great work!",
+            "Amazing job! You're setting new standards!",
+            "Impressive! Stay consistent and keep it up!",
+        ]
+
         if not self.jumps:
             self.feedback_label.setText("No jumps recorded yet.")
             return []
@@ -146,10 +157,6 @@ class GUIFeedbackBox(QWidget):
 
         selected_jump = self.jumps[jump_idx].metrics
         pb_jump = self.jumps[pb_idx].metrics
-        comparison_jump = (
-            self.jumps[second_pb_idx].metrics if jump_idx == pb_idx else pb_jump
-        )
-
         feedback = []
         changes = []
 
@@ -162,7 +169,9 @@ class GUIFeedbackBox(QWidget):
                 height_value = selected_jump.get(metric, 0)
                 pb_value = pb_jump.get(metric, 0)
                 if height_value >= pb_value:
+                    # Add PB feedback
                     feedback.append(feedback_dict["height"]["new_pb"])
+                    feedback.append(random.choice(pb_feedback_messages))
                 else:
                     heights = [jump.metrics.get("height", 0) for jump in self.jumps]
                     sorted_indices = sorted(
@@ -187,30 +196,20 @@ class GUIFeedbackBox(QWidget):
                 ):
                     change = ((selected_value - pb_value) / pb_value) * 100
                 else:
-                    change = 0  # Default to no change if invalid values are encountered
+                    change = 0
 
                 if change > 50:
-                    feedback_line = feedback_dict[metric].get(
-                        "significantly_increase", ""
-                    )
+                    feedback.append(feedback_dict[metric]["significantly_increase"])
                 elif change > 20:
-                    feedback_line = feedback_dict[metric].get("increase", "")
+                    feedback.append(feedback_dict[metric]["increase"])
                 elif change > 5:
-                    feedback_line = feedback_dict[metric].get("slightly_increase", "")
+                    feedback.append(feedback_dict[metric]["slightly_increase"])
                 elif change < -50:
-                    feedback_line = feedback_dict[metric].get(
-                        "significantly_decrease", ""
-                    )
+                    feedback.append(feedback_dict[metric]["significantly_decrease"])
                 elif change < -20:
-                    feedback_line = feedback_dict[metric].get("decrease", "")
+                    feedback.append(feedback_dict[metric]["decrease"])
                 elif change < -5:
-                    feedback_line = feedback_dict[metric].get("slightly_decrease", "")
-
-                else:
-                    feedback_line = ""
-
-                if feedback_line:  # Only add non-empty feedback
-                    feedback.append(feedback_line)
+                    feedback.append(feedback_dict[metric]["slightly_decrease"])
 
         # Add Top 3 Metrics by Change (excluding priority metrics)
         for metric, pb_value in pb_jump.items():
@@ -240,17 +239,17 @@ class GUIFeedbackBox(QWidget):
             feedback_line = ""
 
             if change > 50:
-                feedback_line = feedback_dict[metric].get("significantly_decrease", "")
-            elif change > 20:
-                feedback_line = feedback_dict[metric].get("decrease", "")
-            elif change > 5:
-                feedback_line = feedback_dict[metric].get("slightly_decrease", "")
-            elif change < -50:
                 feedback_line = feedback_dict[metric].get("significantly_increase", "")
-            elif change < -20:
+            elif change > 20:
                 feedback_line = feedback_dict[metric].get("increase", "")
-            elif change < -5:
+            elif change > 5:
                 feedback_line = feedback_dict[metric].get("slightly_increase", "")
+            elif change < -50:
+                feedback_line = feedback_dict[metric].get("significantly_decrease", "")
+            elif change < -20:
+                feedback_line = feedback_dict[metric].get("decrease", "")
+            elif change < -5:
+                feedback_line = feedback_dict[metric].get("slightly_decrease", "")
 
             if feedback_line:  # Only add non-empty feedback
                 feedback.append(feedback_line)
