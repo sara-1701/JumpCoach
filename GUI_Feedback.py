@@ -137,11 +137,9 @@ class GUIFeedbackBox(QWidget):
 
         # Positive PB feedback messages
         pb_feedback_messages = [
-            "Keep doing what you're doing!",
-            "Fantastic performance! Stay explosive!",
-            "You're crushing it! Keep up the great work!",
-            "Amazing job! You're setting new standards!",
-            "Impressive! Stay consistent and keep it up!",
+            "Fantastic performance! Amp up the explosiveness even more!",
+            "See if new techniques can boost you even higher!",
+            "Wow that was good! Can you land even softer?",
         ]
 
         if not self.jumps:

@@ -87,7 +87,6 @@ class Jump:
         takeoff_time, peak_time, landing_time = self.partition
 
         metrics = {
-            "HELLO": 5,
             "airtime": calculate_airtime(self.partition),
             "height_displacement": calculate_height_from_displacement(
                 self.lower_back_disp, self.partition
