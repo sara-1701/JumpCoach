@@ -69,20 +69,29 @@ class IMUDataThread(QThread):
 
     def configure_device(self):
         try:
+            # zSet connection parameters
+            libmetawear.mbl_mw_settings_set_connection_parameters(
+                self.device.board, 7.5, 7.5, 0, 6000
+            )
+
             # Configure accelerometer
-            libmetawear.mbl_mw_acc_set_odr(self.device.board, 100.0)
-            libmetawear.mbl_mw_acc_set_range(self.device.board, 6.0)
+            libmetawear.mbl_mw_acc_bmi160_set_odr(
+                self.device.board, cbindings.AccBmi160Odr._100Hz
+            )  # BMI160-specific call
+            libmetawear.mbl_mw_acc_bosch_set_range(
+                self.device.board, cbindings.AccBoschRange._8G
+            )
             libmetawear.mbl_mw_acc_write_acceleration_config(self.device.board)
             acc_signal = libmetawear.mbl_mw_acc_get_acceleration_data_signal(
                 self.device.board
             )
 
-            # Configure gyroscope
-            libmetawear.mbl_mw_gyro_bmi160_set_odr(
-                self.device.board, cbindings.GyroBoschOdr._50Hz
-            )
+            # Configure gyroscope (matches your friend's code)
             libmetawear.mbl_mw_gyro_bmi160_set_range(
                 self.device.board, cbindings.GyroBoschRange._1000dps
+            )
+            libmetawear.mbl_mw_gyro_bmi160_set_odr(
+                self.device.board, cbindings.GyroBoschOdr._100Hz
             )
             libmetawear.mbl_mw_gyro_bmi160_write_config(self.device.board)
             gyro_signal = libmetawear.mbl_mw_gyro_bmi160_get_rotation_data_signal(

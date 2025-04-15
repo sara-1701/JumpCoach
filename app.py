@@ -6,13 +6,13 @@ from time import sleep
 import pickle
 
 
-def load_jump_objects(filename="Subject4.pkl"):
+def load_jump_objects(filename="MichaelJumps.pkl"):
     with open(filename, "rb") as file:
         jumps = pickle.load(file)
     return jumps
 
 
-def save_jump_objects(jumps, filename="jumpsskk.pkl"):
+def save_jump_objects(jumps, filename="465r76t8.pkl"):
     with open(filename, "wb") as file:
         pickle.dump(jumps, file)
 
@@ -20,14 +20,14 @@ def save_jump_objects(jumps, filename="jumpsskk.pkl"):
 # Define device information
 device_info = {
     "FA:6C:EB:21:F6:9A": "Wrist",
-    "D9:85:F5:D6:7B:ED": "Lower Back",
+    "C5:2D:26:FB:96:48": "Lower Back",
     "CD:36:98:87:7A:4D": "Thigh",
 }
 
 data = {}  # {Device address: (accel_deque, gyro_deque)}
 threads = []  # To manage IMU data threads
 jumps = []
-import_jumps = False
+import_jumps = True
 export_jumps = False
 
 if import_jumps == True:
