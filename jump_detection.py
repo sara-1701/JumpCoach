@@ -236,6 +236,12 @@ class Jump:
             "landing_knee_bend": calculate_max_knee_bend(
                 self.thigh_accel, landing_time, self.thigh_accel[-1][0], True
             ),
+            "takeoff_knee_bend2": calculate_max_knee_bend2(
+                self.thigh_accel, self.thigh_gyro, 0, takeoff_time
+            ),
+            "landing_knee_bend2": calculate_max_knee_bend2(
+                self.thigh_accel, self.thigh_gyro, landing_time, self.thigh_accel[-1][0]
+            ),
         }
 
         return metrics
@@ -452,7 +458,7 @@ def calculate_total_movement(velocity, starttime, endtime, axis):
     timestamps = velocity[:, 0]
     values = np.abs(
         velocity[:, axis_idx]
-    )  # Take absolute velocity to account for direction
+    )  # Take absolute velocity fto account for direction
 
     # Find indices for the time range
     start_idx = np.abs(timestamps - starttime).argmin()
@@ -650,3 +656,47 @@ def calculate_max_knee_bend(data, starttime, endtime, flag=False):
     max_knee_bend = np.max(pitch_angles_degrees)
 
     return max_knee_bend
+
+
+def calculate_max_knee_bend2(accel_data, gyro_data, starttime, endtime, alpha=0.98):
+    """
+    Calculate the maximum knee bend angle (in degrees) using fused accelerometer and gyroscope data.
+    """
+    # Extract data in time window
+    accel_window = accel_data[
+        (accel_data[:, 0] >= starttime) & (accel_data[:, 0] <= endtime)
+    ]
+    gyro_window = gyro_data[
+        (gyro_data[:, 0] >= starttime) & (gyro_data[:, 0] <= endtime)
+    ]
+
+    if accel_window.shape[0] < 2 or gyro_window.shape[0] < 2:
+        return 0  # Not enough data
+
+    time_accel = accel_window[:, 0]
+    ax = accel_window[:, 1]
+    ay = accel_window[:, 2]
+
+    time_gyro = gyro_window[:, 0]
+    gy = gyro_window[:, 2]  # Pitch rate (rad/s)
+
+    # Step 1: Accelerometer pitch angle (degrees)
+    accel_pitch = np.degrees(np.arctan2(-ay, ax))
+
+    # Step 2: Integrate gyro pitch rate to get angle (radians)
+    gyro_pitch = [0]
+    for i in range(1, len(gy)):
+        dt = time_gyro[i] - time_gyro[i - 1]
+        gyro_pitch.append(gyro_pitch[-1] + gy[i] * dt)
+    gyro_pitch = np.array(gyro_pitch)
+
+    # Step 3: Interpolate gyro angle to accel timestamps
+    gyro_pitch_interp = np.interp(time_accel, time_gyro, gyro_pitch)
+
+    # Step 4: Convert gyro_pitch_interp to degrees
+    gyro_pitch_deg = np.degrees(gyro_pitch_interp)
+
+    # Step 5: Fuse
+    fused_pitch = alpha * gyro_pitch_deg + (1 - alpha) * accel_pitch
+
+    return np.max(fused_pitch)

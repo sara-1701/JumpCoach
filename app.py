@@ -9,10 +9,23 @@ import pickle
 def load_jump_objects(filename="MichaelJumps.pkl"):
     with open(filename, "rb") as file:
         jumps = pickle.load(file)
-    return jumps
+    new_jumps = []
+    for jump in jumps:
+        new_jumps.append(
+            Jump(
+                jump.lower_back_accel,
+                jump.lower_back_gyro,
+                jump.wrist_accel,
+                jump.wrist_gyro,
+                jump.thigh_accel,
+                jump.thigh_gyro,
+                jump.detected_time,
+            )
+        )
+    return new_jumps
 
 
-def save_jump_objects(jumps, filename="465r76t8.pkl"):
+def save_jump_objects(jumps, filename="test.pkl"):
     with open(filename, "wb") as file:
         pickle.dump(jumps, file)
 
