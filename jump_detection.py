@@ -179,6 +179,7 @@ class Jump:
             "landing_avg_lateral_arm_speed": calculate_average_speed(
                 self.wrist_vel, "z", landing_time, self.wrist_disp[-1][0]
             ),
+            "total_arm_movement": calculate_total_arm_movement(self.wrist_disp),
             "takeoff_vertical_arm_movement": calculate_movement(
                 self.wrist_disp, "x", 0, takeoff_time
             ),
@@ -230,18 +231,13 @@ class Jump:
             "landing_impact_jerk": calculate_landing_impact(
                 self.wrist_disp, landing_time
             )[1],
-            "takeoff_knee_bend": calculate_max_knee_bend(
+            "takeoff_knee_bend": calculate_max_knee_bend_accel(
                 self.thigh_accel, 0, takeoff_time
             ),
-            "landing_knee_bend": calculate_max_knee_bend(
-                self.thigh_accel, landing_time, self.thigh_accel[-1][0], True
+            "landing_knee_bend": calculate_combined_knee_bend(
+                self.thigh_accel, self.thigh_ang_disp, landing_time, self.thigh_accel[-1][0]
             ),
-            "takeoff_knee_bend2": calculate_max_knee_bend2(
-                self.thigh_accel, self.thigh_gyro, 0, takeoff_time
-            ),
-            "landing_knee_bend2": calculate_max_knee_bend2(
-                self.thigh_accel, self.thigh_gyro, landing_time, self.thigh_accel[-1][0]
-            ),
+
         }
 
         return metrics
@@ -390,10 +386,14 @@ class JumpDetectionThread(QThread):
 def take_integral(data):
     timestamps = data[:, 0]
     values = data[:, 1:]
-    time_intervals = 3.0 / max(len(values), 1)
-    values_centered = values - np.mean(values, axis=0)
-    integrated_values = np.cumsum(values_centered, axis=0) * time_intervals
-    return np.column_stack((timestamps, integrated_values))
+    return cumtrapz(values, timestamps, initial=0)
+
+    #timestamps = data[:, 0]
+    #values = data[:, 1:]
+    #time_intervals = 3.0 / max(len(values), 1)
+    #values_centered = values - np.mean(values, axis=0)
+    #integrated_values = np.cumsum(values_centered, axis=0) * time_intervals
+    #return np.column_stack((timestamps, integrated_values))
 
 
 def calculate_height_from_airtime(airtime):
@@ -523,6 +523,13 @@ def calculate_average_speed(velocity, axis, starttime, endtime):
     if len(phase_velocity) == 0:
         return 0
     return sum(np.abs(phase_velocity)) / len(phase_velocity)
+
+
+def calculate_total_arm_movement(data):
+    x = calculate_movement(day, "x", data[0][0], data[-1][0])
+    y = calculate_movement(day, "y", data[0][0], data[-1][0])
+    z = calculate_movement(day, "z", data[0][0], data[-1][0])
+    return x+y+z
 
 
 def calculate_movement(displacement, axis, starttime, endtime):
@@ -658,45 +665,17 @@ def calculate_max_knee_bend(data, starttime, endtime, flag=False):
     return max_knee_bend
 
 
-def calculate_max_knee_bend2(accel_data, gyro_data, starttime, endtime, alpha=0.98):
-    """
-    Calculate the maximum knee bend angle (in degrees) using fused accelerometer and gyroscope data.
-    """
-    # Extract data in time window
-    accel_window = accel_data[
-        (accel_data[:, 0] >= starttime) & (accel_data[:, 0] <= endtime)
-    ]
-    gyro_window = gyro_data[
-        (gyro_data[:, 0] >= starttime) & (gyro_data[:, 0] <= endtime)
-    ]
+def calculate_max_knee_bend2(gyro_data, starttime, endtime, co=0):
+    gyro_window = gyro_data[(gyro_data[:, 0] >= starttime) & (gyro_data[:, 0] <= endtime)]
+    time = gyro_window[:, 0]
+    gz_deg = gyro_window[:, 3]
+    gz_rad = np.deg2rad(gz_deg)
+    if co > 0: gz_rad = low_pass_filter(gz_rad, co, 100)
+    angle_deg = np.degrees(angle_rad)
+    return np.max(np.abs(angle_deg))  # max bend angle (degrees)
 
-    if accel_window.shape[0] < 2 or gyro_window.shape[0] < 2:
-        return 0  # Not enough data
 
-    time_accel = accel_window[:, 0]
-    ax = accel_window[:, 1]
-    ay = accel_window[:, 2]
-
-    time_gyro = gyro_window[:, 0]
-    gy = gyro_window[:, 2]  # Pitch rate (rad/s)
-
-    # Step 1: Accelerometer pitch angle (degrees)
-    accel_pitch = np.degrees(np.arctan2(-ay, ax))
-
-    # Step 2: Integrate gyro pitch rate to get angle (radians)
-    gyro_pitch = [0]
-    for i in range(1, len(gy)):
-        dt = time_gyro[i] - time_gyro[i - 1]
-        gyro_pitch.append(gyro_pitch[-1] + gy[i] * dt)
-    gyro_pitch = np.array(gyro_pitch)
-
-    # Step 3: Interpolate gyro angle to accel timestamps
-    gyro_pitch_interp = np.interp(time_accel, time_gyro, gyro_pitch)
-
-    # Step 4: Convert gyro_pitch_interp to degrees
-    gyro_pitch_deg = np.degrees(gyro_pitch_interp)
-
-    # Step 5: Fuse
-    fused_pitch = alpha * gyro_pitch_deg + (1 - alpha) * accel_pitch
-
-    return np.max(fused_pitch)
+def calculate_combined_knee_bend(accel_data, gyro_data, starttime, endtime, co=1, alpha=0.68):
+    accel_angle = calculate_max_knee_bend_accel(accel_data, starttime, endtime, co)
+    gyro_angle = calculate_max_knee_bend_gyro(gyro_data, starttime, endtime, co)
+    return alpha * gyro_angle + (1 - alpha) * accel_angle
