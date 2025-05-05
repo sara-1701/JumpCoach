@@ -113,7 +113,7 @@ class GUIJump(QWidget):
 
         # Create dropdowns for plot selection
         accel_dropdown = QComboBox(self)
-        accel_dropdown.addItems(["Accel", "Vel", "Disp"])
+        accel_dropdown.addItems(["Accel", "Vel", "Disp", "Jerk"])
         accel_dropdown.currentTextChanged.connect(self.set_accel_data_type)
         gyro_dropdown = QComboBox(self)
         gyro_dropdown.addItems(["Ang Vel", "Ang Disp"])
@@ -175,7 +175,7 @@ class GUIJump(QWidget):
 
     def set_accel_data_type(self, data_type):
         print(f"Selected accel data type: {data_type}")  # Debug line
-        mapping = {"Accel": "accel", "Vel": "vel", "Disp": "disp"}
+        mapping = {"Accel": "accel", "Vel": "vel", "Disp": "disp", "Jerk": "jerk"}
         self.accel_type = mapping.get(
             data_type, "accel"
         )  # Fixed typo: self.data_type -> self.accel_type
@@ -236,6 +236,7 @@ class GUIJump(QWidget):
             "disp": "Disp. (m)",
             "gyro": "Ang. Vel. (°/s)",
             "ang_disp": "Ang. Disp. (°)",
+            "jerk": "Jerk (m/s^3)",
         }
         axis_ranges = {
             "accel": (-50, 50),  # Acceleration in m/s²
@@ -243,6 +244,7 @@ class GUIJump(QWidget):
             "disp": (-3, 3),  # Displacement in meters
             "gyro": (-1000, 1000),  # Angular velocity in °/s
             "ang_disp": (-180, 180),  # Angular displacement in degrees
+            "jerk": (-200, 200),
         }
         axis_units = {
             "accel": "Acceleration (m/s²)",
@@ -250,6 +252,7 @@ class GUIJump(QWidget):
             "disp": "Displacement (m)",
             "gyro": "Angular Velocity (°/s)",
             "ang_disp": "Angular Displacement (°)",
+            "jerk": "Jerk (m/s^3)",
         }
 
         for device_key, device_name in self.device_info.items():

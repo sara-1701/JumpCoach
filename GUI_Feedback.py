@@ -5,257 +5,166 @@ import random
 
 
 class GUIFeedbackBox(QWidget):
-    """A widget to display feedback based on jump metrics."""
+    """Generate concise, actionable feedback after each jump.
 
-    def __init__(self, color_palette, jumps):
+    Logic
+    -----
+    * Compare the current jump with the PB **up to that jump**.
+    * If it *is* the PB → single congratulation line; no coaching cue.
+    * Otherwise select ONE metric with the largest absolute % deviation from the PB.
+        – Take‑off knee bend  (higher is better)
+        – Arm swing          (higher is better)
+        – Landing impact     (lower is better)
+    * Give a cue telling the athlete to move **toward** the PB value.
+    * Cues are suppressed when |deviation| < 5 % ("keep consistent").
+    """
+
+    # ----------------------------- CONFIG --------------------------------
+    _METRICS = {
+        "takeoff_knee_bend": {
+            "name": "knee bend",
+            "pref": "higher",  # more is better
+            "more": {
+                "mild": "Bend your knees a little more during take‑off for extra power.",
+                "med": "Bend your knees more on take‑off to generate force.",
+                "large": "Drop deeper into your knees pre‑take‑off for max explosiveness.",
+            },
+            "less": {
+                "mild": "Bend your knees slightly less to avoid over‑squatting.",
+                "med": "Don’t over‑bend – come up a bit higher before take‑off.",
+                "large": "Way too deep – bend much less to stay explosive.",
+            },
+        },
+        "total_arm_movement": {
+            "name": "arm swing",
+            "pref": "higher",  # more is better
+            "more": {
+                "mild": "Add a bit more arm swing to boost lift.",
+                "med": "Drive your arms faster to gain extra height.",
+                "large": "Really whip your arms upward for maximum propulsion.",
+            },
+            "less": {
+                "mild": "Tame the arm swing slightly for better coordination.",
+                "med": "Reduce arm swing to stay controlled.",
+                "large": "Your arms are excessive – swing much less for efficiency.",
+            },
+        },
+        "landing_impact_jerk": {
+            "name": "landing impact",
+            "pref": "lower",  # less is better
+            "more": {
+                "mild": "Soften your landing a bit by bending knees and ankles.",
+                "med": "Focus on cushioning the landing to reduce impact.",
+                "large": "Land MUCH softer – absorb with deeper knee flexion.",
+            },
+            "less": {
+                "mild": "Good – landing impact is lower. Keep it soft!",
+                "med": "Nice! Landing impact has reduced.",
+                "large": "Great! Landing impact is MUCH softer.",
+            },
+        },
+    }
+
+    _COMPLIMENTS = ["Good jump!", "Great!", "Awesome!", "Strong effort!"]
+
+    # ---------------------------------------------------------------------
+    def __init__(self, palette, jumps):
         super().__init__()
-        self.color_palette = color_palette
-        self.jumps = jumps  # Reference to the external jumps list
-        self.init_ui()
+        self.palette = palette
+        self.jumps = jumps
+        self._init_ui()
 
-    def init_ui(self):
-        # Main layout
+    # ---------------------- UI SETUP -------------------------------------
+    def _init_ui(self):
         layout = QVBoxLayout(self)
-        layout.setContentsMargins(10, 10, 10, 10)  # Remove margins
-        layout.setSpacing(5)  # Minimal spacing between widgets
+        layout.setContentsMargins(10, 10, 10, 10)
+        layout.setSpacing(5)
 
-        # Feedback header label
-        self.header_title = QLabel("Feedback for Next Jump")
-        self.header_title.setAlignment(Qt.AlignCenter)
-        self.header_title.setStyleSheet(
-            f"""
-            font-size: 27px;
-            font-family: 'Roboto';
-            color: {self.color_palette['plot_fg']};
-            margin: 0px;
-            padding: 0px;
-            """
+        header = QLabel("Feedback for Next Jump")
+        header.setAlignment(Qt.AlignCenter)
+        header.setStyleSheet(
+            f"font-size:27px;font-family:'Roboto';color:{self.palette['plot_fg']};"
         )
-        layout.addWidget(self.header_title, stretch=0)  # No stretch for the title
+        layout.addWidget(header)
 
-        # Feedback text label
-        self.feedback_label = QLabel("Perform a jump to receive feedback!")
-        self.feedback_label.setAlignment(Qt.AlignLeft)  # Set text alignment to left
-        self.feedback_label.setWordWrap(True)  # Allow multi-line feedback
-        self.feedback_label.setStyleSheet(
-            f"""
-            font-size: 24px;
-            font-family: 'Roboto';
-            background-color: {self.color_palette['white']};
-            color: {self.color_palette['black']};
-            border: 5px solid {self.color_palette['accent_color']};
-            border-radius: 5px;
-            margin: 0px;
-            padding: 15px;
-            line-height: 1.4;  /* Reduced line spacing for more compact feedback lines */
-            """
+        self.label = QLabel("Perform a jump to receive feedback!")
+        self.label.setAlignment(Qt.AlignLeft)
+        self.label.setWordWrap(True)
+        self.label.setStyleSheet(
+            f"font-size:24px;font-family:'Roboto';background:{self.palette['white']};"
+            f"color:{self.palette['black']};border:5px solid {self.palette['accent_color']};"
+            f"border-radius:5px;padding:15px;line-height:1.4;"
         )
-        layout.addWidget(
-            self.feedback_label, stretch=1
-        )  # Use stretch for the feedback box
+        layout.addWidget(self.label)
 
-    def update_feedback(self, jump_idx, pb_idx, second_pb_idx):
-        """
-        Update feedback based on metrics comparison between the selected jump and PB.
-        """
-        feedback_dict = {
-            # Priority Metrics
-            "height": {
-                "new_pb": "NEW PB! Amazing jump!",
-                "high_rank": "This is your #X highest jump.",
-                "worst": "This is your worst jump so far...",
-            },
-            "landing_impact_jerk": {
-                "slightly_increase": "Try to land slightly softer for safety.",
-                "increase": "Landing was harder so focus on landing softer.",
-                "significantly_increase": "Land much softer! Avoid slamming into the ground.",
-                "slightly_decrease": "Landing is slightly softer. Good.",
-                "decrease": "Landing impact improved. Great!",
-                "significantly_decrease": "Landing impact is significantly better. Awesome!",
-            },
-            # Takeoff Metrics
-            "takeoff_knee_bend": {
-                "slightly_increase": "Bend your knees slightly more during takeoff.",
-                "increase": "Bend your knees more during takeoff.",
-                "significantly_increase": "Bend your knees a lot more during takeoff.",
-                "slightly_decrease": "Bend your knees slightly less during takeoff.",
-                "decrease": "Bend your knees less during takeoff.",
-                "significantly_decrease": "Don't overbend your knees during takeoff.",
-            },
-            "takeoff_avg_vertical_arm_speed": {
-                "slightly_increase": "Swing your arms slightly more during takeoff.",
-                "increase": "Swing your arms more during takeoff.",
-                "significantly_increase": "Your arms are stiff. Swing them more during takeoff.",
-                "slightly_decrease": "Swing your arms slightly less.",
-                "decrease": "Swing your arms less.",
-                "significantly_decrease": "Your arms are going crazy. Swing them less during takeoff.",
-            },
-            "takeoff_avg_lateral_arm_speed": {
-                "slightly_increase": "Slightly increase lateral arm swing during takeoff.",
-                "increase": "Increase lateral arm swing during takeoff.",
-                "significantly_increase": "Significantly increase lateral arm swing during takeoff.",
-                "slightly_decrease": "Slightly decrease lateral arm swing during takeoff.",
-                "decrease": "Decrease lateral arm swing during takeoff.",
-                "significantly_decrease": "Your arms are flopping like a bird. Decrease lateral arm swing during takeoff.",
-            },
-            # Airtime Metrics
-            "airtime": {
-                "slightly_increase": "",
-                "increase": "",
-                "significantly_increase": "Crazy airtime increase. Are you cheating JumpCoach?",
-                "slightly_decrease": "",
-                "decrease": "",
-                "significantly_decrease": "You barely lifted your legs... Try harder...",
-            },
-            # Landing Metrics
-            "landing_knee_bend": {
-                "slightly_increase": "Bend your knees slightly more during landing.",
-                "increase": "Bend your knees more during landing.",
-                "significantly_increase": "You're landing too stiffly. Bend your knees properly during landing.",
-                "slightly_decrease": "Bend your knees slightly less during landing.",
-                "decrease": "Bend your knees less during landing.",
-                "significantly_decrease": "Don't overbend your knees during landing. You will get hurt doing this",
-            },
-            # Movement Metrics
-            "forward_backward_movement": {
-                "slightly_increase": "",
-                "increase": "",
-                "significantly_increase": "You're falling forward/backward when jumping.  Stay more balanced.",
-                "slightly_decrease": "",
-                "decrease": "",
-                "significantly_decrease": "You're falling forward/backward when jumping.  Stay more balanced.",
-            },
-            "lateral_movement": {
-                "slightly_increase": "",
-                "increase": "",
-                "significantly_increase": "You're hopping sideways like a crab. Stay more balanced.",
-                "slightly_decrease": "",
-                "decrease": "",
-                "significantly_decrease": "You're hopping sideways like a crab. Stay more balanced.",
-            },
-        }
+    # ---------------------- FEEDBACK -------------------------------------
+    def update_feedback(self, cur_idx: int, pb_idx: int, _second_idx: int):
+        jump = self.jumps[cur_idx]
 
-        # Positive PB feedback messages
-        pb_feedback_messages = [
-            "Fantastic performance! Amp up the explosiveness even more!",
-            "See if new techniques can boost you even higher!",
-            "Wow that was good! Can you land even softer?",
-        ]
-
-        if not self.jumps:
-            self.feedback_label.setText("No jumps recorded yet.")
-            return []
-
-        # Handle the baseline case
-        if len(self.jumps) == 1:
-            self.feedback_label.setText(
-                "Baseline Recorded. Jump again to receive feedback!"
+        # Baseline (first jump ever)
+        if pb_idx is None or pb_idx < 0 or len(self.jumps) == 1 or cur_idx == 0:
+            return self._finalize(
+                jump, "Baseline recorded. No previous jump to compare.", []
             )
-            return []
 
-        selected_jump = self.jumps[jump_idx].metrics
-        pb_jump = self.jumps[pb_idx].metrics
-        feedback = []
-        changes = []
+        cur_m = jump.metrics
+        pb_m = self.jumps[pb_idx].metrics
 
-        # Priority metrics
-        priority_metrics = ["height", "landing_impact_jerk"]
+        # NEW PB – no coaching cue
+        if cur_idx == pb_idx:
+            msg = "NEW PB! Fantastic jump – see if you can beat it next time!"
+            return self._finalize(jump, msg, ["height"])
 
-        # Handle priority metrics
-        for metric in priority_metrics:
-            if metric == "height":
-                height_value = selected_jump.get(metric, 0)
-                pb_value = pb_jump.get(metric, 0)
-                if height_value >= pb_value:
-                    # Add PB feedback
-                    feedback.append(feedback_dict["height"]["new_pb"])
-                    feedback.append(random.choice(pb_feedback_messages))
-                else:
-                    heights = [jump.metrics.get("height", 0) for jump in self.jumps]
-                    sorted_indices = sorted(
-                        range(len(heights)), key=lambda i: heights[i], reverse=True
-                    )
-                    selected_jump_rank = sorted_indices.index(jump_idx) + 1
-                    if selected_jump_rank == len(heights):
-                        feedback.append(feedback_dict["height"]["worst"])
-                    else:
-                        feedback.append(
-                            feedback_dict["height"]["high_rank"].replace(
-                                "#X", str(selected_jump_rank)
-                            )
-                        )
-            elif metric == "landing_impact_jerk":
-                selected_value = selected_jump.get(metric, 0)
-                pb_value = pb_jump.get(metric, 0)
-                if (
-                    pb_value != 0
-                    and not np.isnan(pb_value)
-                    and not np.isnan(selected_value)
-                ):
-                    change = ((selected_value - pb_value) / pb_value) * 100
-                else:
-                    change = 0
+        # ---------------- HEIGHT RANK LINE ----------------
+        rank_line = self._height_rank_line(cur_m.get("height", 0), cur_idx)
+        lines = [rank_line]
 
-                if change > 50:
-                    feedback.append(feedback_dict[metric]["significantly_increase"])
-                elif change > 20:
-                    feedback.append(feedback_dict[metric]["increase"])
-                elif change > 5:
-                    feedback.append(feedback_dict[metric]["slightly_increase"])
-                elif change < -50:
-                    feedback.append(feedback_dict[metric]["significantly_decrease"])
-                elif change < -20:
-                    feedback.append(feedback_dict[metric]["decrease"])
-                elif change < -5:
-                    feedback.append(feedback_dict[metric]["slightly_decrease"])
-
-        # Add Top 3 Metrics by Change (excluding priority metrics)
-        for metric, pb_value in pb_jump.items():
-            if (
-                metric in priority_metrics  # Skip priority metrics
-                or metric not in feedback_dict  # Skip metrics not in the dictionary
-            ):
+        # ---------------- TECH CUE ----------------
+        chosen, abs_dev, cue = None, 0, None
+        for metric, cfg in self._METRICS.items():
+            cur_val, pb_val = cur_m.get(metric, np.nan), pb_m.get(metric, np.nan)
+            if np.isnan(cur_val) or np.isnan(pb_val) or pb_val == 0:
                 continue
-            selected_value = selected_jump.get(metric, 0)
-            if (
-                pb_value != 0
-                and not np.isnan(pb_value)
-                and not np.isnan(selected_value)
-            ):
-                change = ((selected_value - pb_value) / pb_value) * 100
-            else:
-                change = 0
+            pct = (cur_val - pb_val) / abs(pb_val) * 100  # signed
+            if abs(pct) > abs_dev:
+                abs_dev, chosen = abs(pct), metric
+                better_direction = (
+                    "more"
+                    if (cfg["pref"] == "higher" and cur_val < pb_val)
+                    or (cfg["pref"] == "lower" and cur_val > pb_val)
+                    else "less"
+                )
+                if abs_dev < 5:
+                    cue = f"Keep your {cfg['name']} consistent – looking good!"
+                else:
+                    level = (
+                        "large" if abs_dev > 50 else "med" if abs_dev > 20 else "mild"
+                    )
+                    cue = cfg[better_direction][level]
 
-            changes.append((metric, change))
+        if cue:
+            lines.append(cue)
+            used = ["height", chosen]
+        else:
+            lines.append(
+                "Drive your arms explosively and extend through your hips for more height."
+            )
+            used = ["height"]
 
-        # Sort by absolute change and get top 3
-        changes = sorted(changes, key=lambda x: abs(x[1]), reverse=True)
-        top_changes = []
-        for metric, change in changes:
-            if len(top_changes) >= 1:
-                break
-            feedback_line = ""
+            # Build multi‑line bullet list, guarantee newline separation
+        text = "\n".join(f"•{l}" for l in lines)
+        return self._finalize(jump, text, used)
 
-            if change > 50:
-                feedback_line = feedback_dict[metric].get("significantly_increase", "")
-            elif change > 20:
-                feedback_line = feedback_dict[metric].get("increase", "")
-            elif change > 5:
-                feedback_line = feedback_dict[metric].get("slightly_increase", "")
-            elif change < -50:
-                feedback_line = feedback_dict[metric].get("significantly_decrease", "")
-            elif change < -20:
-                feedback_line = feedback_dict[metric].get("decrease", "")
-            elif change < -5:
-                feedback_line = feedback_dict[metric].get("slightly_decrease", "")
+    # ---------------------- helpers --------------------------------------
+    def _height_rank_line(self, cur_height, idx):
+        heights = [j.metrics.get("height", 0) for j in self.jumps[: idx + 1]]
+        rank = sorted(heights, reverse=True).index(cur_height) + 1
+        if rank == len(heights):
+            return "This is your lowest jump yet – push higher next time!"
+        return f"This is your #{rank} highest jump – aim to beat the PB!"
 
-            if feedback_line:  # Only add non-empty feedback
-                feedback.append(feedback_line)
-                top_changes.append(metric)
-
-        # Format feedback as bullet points with a blank line between sections
-        formatted_feedback = "\n\n".join(f"• {item}" for item in feedback)
-        self.feedback_label.setText(formatted_feedback)
-
-        # Return metrics for further use
-        return priority_metrics + top_changes
+    def _finalize(self, jump, text, metrics):
+        jump.feedback = text
+        jump.feedback_metrics = metrics
+        self.label.setText(text)
+        return metrics
