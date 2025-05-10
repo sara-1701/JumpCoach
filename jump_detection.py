@@ -43,6 +43,7 @@ class Jump:
         thigh_accel,
         thigh_gyro,
         detected_time,
+        partition=None,
         imported=False,
     ):
         self.detected_time = detected_time
@@ -73,7 +74,10 @@ class Jump:
 
         # --- Partition & Metrics ---
         try:
-            self.partition = self.find_jump_events()
+            if imported:
+                self.partition = partition
+            else:
+                self.partition = self.find_jump_events()
         except Exception as e:
             print(f"❌ Partitioning failed: {e}")
             self.partition = None

@@ -7,9 +7,9 @@ import pickle
 
 # -------------------- CONFIG --------------------
 IMPORT_JUMPS = True
-EXPORT_JUMPS = False
-INPUT_FILENAME = "May6/Russel6.pkl"
-OUTPUT_FILENAME = "May9/x.pkl"
+EXPORT_JUMPS = True
+INPUT_FILENAME = "May5/Zengwhen4.pkl"
+OUTPUT_FILENAME = "May5/Zhengyu.pkl"
 
 DEVICE_INFO = {
     "FA:6C:EB:21:F6:9A": "Wrist",
@@ -29,7 +29,7 @@ def load_jumps(filename, *, recalc=True):
         return loaded
 
     rebuilt = []
-    for j in loaded:  # j is the pickled Jump
+    for i, j in enumerate(loaded):  # j is the pickled Jump
         rebuilt.append(
             Jump(
                 lower_back_accel=j.lower_back_accel,
@@ -39,6 +39,7 @@ def load_jumps(filename, *, recalc=True):
                 thigh_accel=j.thigh_accel,
                 thigh_gyro=j.thigh_gyro,
                 detected_time=j.detected_time,
+                partition=j.partition,
                 imported=True,
             )
         )
