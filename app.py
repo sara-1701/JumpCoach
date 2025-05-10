@@ -8,8 +8,8 @@ import pickle
 # -------------------- CONFIG --------------------
 IMPORT_JUMPS = True
 EXPORT_JUMPS = False
-INPUT_FILENAME = "April29/Bo3.pkl"
-OUTPUT_FILENAME = "xx.pkl"
+INPUT_FILENAME = "May6/Russel6.pkl"
+OUTPUT_FILENAME = "May9/x.pkl"
 
 DEVICE_INFO = {
     "FA:6C:EB:21:F6:9A": "Wrist",
@@ -39,6 +39,7 @@ def load_jumps(filename, *, recalc=True):
                 thigh_accel=j.thigh_accel,
                 thigh_gyro=j.thigh_gyro,
                 detected_time=j.detected_time,
+                imported=True,
             )
         )
     return rebuilt

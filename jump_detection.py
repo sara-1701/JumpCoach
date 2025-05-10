@@ -43,6 +43,7 @@ class Jump:
         thigh_accel,
         thigh_gyro,
         detected_time,
+        imported=False,
     ):
         self.detected_time = detected_time
 
@@ -55,20 +56,20 @@ class Jump:
         self.thigh_gyro = interpolate_to_uniform_spacing(thigh_gyro)
 
         # --- Processed Signals ---
-        self.lower_back_vel = take_integral(lower_back_accel)
+        self.lower_back_vel = take_integral(self.lower_back_accel)
         self.lower_back_disp = take_integral(self.lower_back_vel)
-        self.lower_back_jerk = take_derivative(lower_back_accel)
-        self.lower_back_ang_disp = take_integral(lower_back_gyro)
+        self.lower_back_jerk = take_derivative(self.lower_back_accel)
+        self.lower_back_ang_disp = take_integral(self.lower_back_gyro)
 
-        self.wrist_vel = take_integral(wrist_accel)
+        self.wrist_vel = take_integral(self.wrist_accel)
         self.wrist_disp = take_integral(self.wrist_vel)
-        self.wrist_jerk = take_derivative(wrist_accel)
-        self.wrist_ang_disp = take_integral(wrist_gyro)
+        self.wrist_jerk = take_derivative(self.wrist_accel)
+        self.wrist_ang_disp = take_integral(self.wrist_gyro)
 
-        self.thigh_vel = take_integral_for_leg(thigh_accel)
+        self.thigh_vel = take_integral_for_leg(self.thigh_accel)
         self.thigh_disp = take_integral_for_leg(self.thigh_vel)
-        self.thigh_jerk = take_derivative(thigh_accel)
-        self.thigh_ang_disp = take_integral_for_leg(thigh_gyro)
+        self.thigh_jerk = take_derivative(self.thigh_accel)
+        self.thigh_ang_disp = take_integral_for_leg(self.thigh_gyro)
 
         # --- Partition & Metrics ---
         try:

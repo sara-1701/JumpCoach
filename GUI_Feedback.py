@@ -102,7 +102,7 @@ class GUIFeedbackBox(QWidget):
         jump = self.jumps[cur_idx]
 
         # Baseline (first jump ever)
-        if pb_idx is None or pb_idx < 0 or len(self.jumps) == 1 or cur_idx == 0:
+        if cur_idx == 0:  # pb_idx is None or pb_idx < 0 or len(self.jumps) == 1 or
             return self._finalize(
                 jump, "Baseline recorded. No previous jump to compare.", []
             )
